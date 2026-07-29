@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Données préparées et poids : jamais dans git (voir docs/POIDS.md)
+data/brut/
+data/prepare/
+data/tokenizer/
+sorties/
+*.bin
+*.idx
+*.safetensors
+*.pt
+*.ckpt
+
+# Le corpus d'exemple, lui, EST versionné : il est petit et nécessaire aux tests.
+!data/echantillon/**
+
+# Divers
+.DS_Store
+*.log
