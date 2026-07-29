@@ -323,10 +323,34 @@ def cmd_data_wikipedia(args) -> int:
 
     print()
     print("Suite :")
-    print(f"  futo tokenizer entrainer --corpus {resultat.chemin} --vocab 32768 \\")
-    print("                           --octets-max 2000000000")
+    print(f"  futo data controler {resultat.chemin}")
+    print(f"  futo tokenizer entrainer --corpus {resultat.chemin} --vocab 32768")
     print(f"  futo data preparer --corpus {resultat.chemin} --separateur jsonl")
     return 0
+
+
+def cmd_data_controler(args) -> int:
+    """Dit si un corpus est propre, avant d'engager quoi que ce soit."""
+    from .controle import controler_corpus, extraire_echantillon
+
+    fichiers = _etendre(args.corpus)
+    print(f"Contrôle de {len(fichiers)} fichier(s)"
+          + (f", {args.documents_max} premiers documents" if args.documents_max else "")
+          + "\n")
+
+    rapport = controler_corpus(fichiers, documents_max=args.documents_max)
+    print(rapport)
+
+    if args.echantillon:
+        print()
+        print("=" * 72)
+        print("Extraits, à lire à l'œil — les compteurs disent « propre »,")
+        print("seule la lecture dit « lisible ».")
+        for i, texte in enumerate(extraire_echantillon(fichiers, n=args.echantillon), 1):
+            print(f"\n--- extrait {i} " + "-" * 52)
+            print(texte)
+
+    return 0 if rapport.verdict()[0] else 1
 
 
 def cmd_data_telecharger(args) -> int:
@@ -623,6 +647,16 @@ Chaque commande accepte --set pour surcharger la configuration :
                    help="n'écrit pas dans data/SOURCES.md (déconseillé)")
     p.add_argument("--silencieux", action="store_true")
     p.set_defaults(fonction=cmd_data_wikipedia, url=None)
+
+    p = sous_data.add_parser(
+        "controler", help="vérifie qu'un corpus est propre avant de l'entraîner"
+    )
+    p.add_argument("corpus", nargs="+", help="fichiers .jsonl ou .txt")
+    p.add_argument("--documents-max", type=int, default=None,
+                   help="ne contrôle que les N premiers documents")
+    p.add_argument("--echantillon", type=int, default=2,
+                   help="nombre d'extraits à afficher (0 pour aucun)")
+    p.set_defaults(fonction=cmd_data_controler)
 
     p = sous_data.add_parser("telecharger", help="marche à suivre pour un vrai corpus français")
     p.set_defaults(fonction=cmd_data_telecharger)

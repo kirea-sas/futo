@@ -155,6 +155,18 @@ plusieurs se comportent mal sur le français :
 - **Filtre de « qualité » par perplexité.** Il faut un modèle de référence
   français ; un modèle anglophone rejettera tout.
 
+Avant et après chaque étape, contrôlez ce que vous avez réellement :
+
+```bash
+futo data controler data/brut/corpus.jsonl --documents-max 5000
+```
+
+La commande compte ce qui n'aurait pas dû survivre — accolades de modèle,
+crochets de lien, balises, entités HTML — en montrant un exemple de chacune,
+mesure la typographie française, repère les doublons exacts, et rend un verdict.
+Un nettoyage qui laisse passer 2 % de balisage ne se voit pas à l'œil sur trois
+articles ; il se voit ici.
+
 Étapes recommandées, dans l'ordre :
 
 1. **Normalisation Unicode NFC** — la même règle qu'à l'entraînement du

@@ -246,13 +246,14 @@ futo/
   tokenizer.py   BPE au niveau octet, découpe adaptée au français
   data.py        format de shards, préparation, chargeur déterministe
   wikipedia.py   conversion d'un dump Wikipédia en corpus
+  controle.py    contrôle qualité d'un corpus avant entraînement
   train.py       boucle d'entraînement, plannings, checkpoints, MFU, journal
   eval.py        perplexité, bits par octet, sondes grammaticales
   cli.py         la commande « futo », dont « bench » (débit réel mesuré)
 configs/         les quatre tailles, plus les réglages communs
 data/echantillon/  142 Ko de français original, pour les tests hors ligne
 data/sondes/     les 72 paires minimales françaises
-tests/           240 tests, 17 s sur processeur, sans réseau
+tests/           266 tests, 17 s sur processeur, sans réseau
 docs/            architecture, données, carte du modèle, Mac
 ```
 
@@ -264,7 +265,7 @@ docs/            architecture, données, carte du modèle, Mac
 pytest
 ```
 
-240 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
+266 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
 ne vérifient pas des formes de tenseurs mais des propriétés qu'un modèle peut
 violer en silence :
 
