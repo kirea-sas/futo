@@ -17,7 +17,11 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 - [x] Prise en charge du Mac (MPS) : détection de la puce, précision mixte
       essayée puis repli annoncé, configuration `futo-mac` — voir docs/MAC.md
 - [x] Corpus d'exemple original de 142 Ko, licence propre, pour les tests hors ligne
-- [x] 161 tests, 11 s sur processeur, sans réseau — CI GitHub Actions
+- [x] 188 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
+      dont des tests de la DOCUMENTATION : les blocs de commandes doivent
+      être copiables-collables (une apostrophe dans un commentaire shell
+      bloque zsh sur « quote> »), les liens internes doivent pointer
+      quelque part, et les sous-commandes citées doivent exister
 
 ## 🔥 Prochain chantier — les données
 
@@ -86,7 +90,7 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 | Fertilité du tokenizer | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
 | Mots rendus en un seul token | 62,6 % | idem |
 | Aller-retour tokenizer | exact | accents, ligatures, guillemets, émojis, code |
-| Suite de tests | 161 tests, 11 s | 4 cœurs, hors ligne |
+| Suite de tests | 188 tests, 17 s | 4 cœurs, hors ligne |
 | Entraînement `futo-tiny` | 400 pas, 45 s, perte 8,3 → 4,17 | 4 cœurs, fp32 |
 | Débit `futo-tiny` | ~19 000 tokens/s | 4 cœurs, fp32 |
 

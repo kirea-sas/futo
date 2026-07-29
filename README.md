@@ -26,17 +26,17 @@ plus que le calcul.
 git clone https://github.com/kirea-sas/futo && cd futo
 pip install -e ".[dev]"
 
-# 1. Un tokenizer français, entraîné sur le corpus d'exemple livré avec le dépôt
+# 1. Un tokenizer francais, entraine sur le corpus fourni dans le depot
 futo tokenizer entrainer --corpus 'data/echantillon/*.txt' --vocab 4096
 
-# 2. Le corpus, encodé en shards binaires
+# 2. Le corpus, encode en shards binaires
 futo data preparer --corpus 'data/echantillon/*.txt' --fraction-val 0.05 \
                    --tokens-par-shard 30000
 
-# 3. Un modèle de 1,3 M de paramètres, sur processeur
+# 3. Un modele de 1,3 M de parametres, sur processeur
 futo train configs/futo-tiny.yaml --set train.max_steps=400
 
-# 4. Ce qu'il a appris
+# 4. Voir ce que le modele a appris
 futo eval sorties/tiny/meilleur.pt
 futo generer sorties/tiny/dernier.pt --amorce "Le vieux moulin" --max-tokens 60
 ```
@@ -226,7 +226,7 @@ futo/
 configs/         les quatre tailles, plus les réglages communs
 data/echantillon/  142 Ko de français original, pour les tests hors ligne
 data/sondes/     les 72 paires minimales françaises
-tests/           161 tests, 11 s sur processeur, sans réseau
+tests/           188 tests, 17 s sur processeur, sans réseau
 docs/            architecture, données, carte du modèle, Mac
 ```
 
@@ -238,7 +238,7 @@ docs/            architecture, données, carte du modèle, Mac
 pytest
 ```
 
-161 tests, 11 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
+188 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
 ne vérifient pas des formes de tenseurs mais des propriétés qu'un modèle peut
 violer en silence :
 
@@ -252,6 +252,7 @@ violer en silence :
 | `test_surapprentissage_dun_lot` | qu'on entraîne des heures sans rien apprendre |
 | `test_comptage_parametres_analytique` | qu'on loue le mauvais GPU |
 | `test_aller_retour_exact` | que le tokenizer perde des accents ou des ligatures |
+| `test_commentaires_shell_sans_apostrophe` | qu'un bloc du README bloque le terminal au copier-coller |
 
 Deux d'entre eux ont attrapé de vrais défauts pendant l'écriture du dépôt.
 
