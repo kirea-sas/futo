@@ -272,10 +272,17 @@ def test_un_corpus_jsonl_nentraine_pas_le_tokenizer_sur_du_json(tmp_path):
     # échouerait pour rien.
     tokens = [tok.decoder([i], sauter_speciaux=False) for i in range(tok.vocab_size)]
 
-    # Le corpus français ne contient ni accolade ni guillemet droit : s'il en
-    # apparaît dans un token, ils viennent forcément de la syntaxe JSON.
-    parasites = [j for j in tokens if "{" in j or "}" in j or '"' in j]
-    assert not parasites, f"Tokens venus du JSON : {parasites[:10]}"
+    # Les caractères SEULS « { », « } » et « " » font partie des 256 octets de
+    # l'alphabet initial : ils sont là dans tout BPE au niveau octet, quel que
+    # soit le corpus, et leur présence ne prouve rien. Ce qui trahit le JSON,
+    # c'est une FUSION : un token de plusieurs caractères qui en contient un.
+    # BPE ne fusionne que ce qu'il a vu souvent — `{"` ou `", "` ne peuvent
+    # venir que de la syntaxe.
+    parasites = [
+        j for j in tokens
+        if len(j) > 1 and ("{" in j or "}" in j or '"' in j)
+    ]
+    assert not parasites, f"Fusions issues du JSON dans le vocabulaire : {parasites[:10]}"
 
     joints = "".join(tokens)
     assert any(mot in joints for mot in ("Lyon", "confluent", "cœur", "histoire"))
