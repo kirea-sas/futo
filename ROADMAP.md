@@ -17,7 +17,7 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 - [x] Prise en charge du Mac (MPS) : détection de la puce, précision mixte
       essayée puis repli annoncé, configuration `futo-mac` — voir docs/MAC.md
 - [x] Corpus d'exemple original de 142 Ko, licence propre, pour les tests hors ligne
-- [x] 266 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
+- [x] 272 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
       et le démarrage du README rejoué depuis un clone neuf dans un
       environnement virtuel vierge, jusqu'à la génération de texte,
       dont des tests de la DOCUMENTATION : les blocs de commandes doivent
@@ -92,9 +92,14 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
 - [ ] Le tirage des fenêtres se fait avec remise plutôt que par permutation
       exacte du corpus. Négligeable sur une seule époque, à revoir si l'on passe
       à plusieurs passes
-- [ ] Le nettoyeur de wikitexte n'a jamais vu de vrai dump : il est testé sur
-      des fragments écrits à la main. Les surprises viendront des cas tordus
-      d'un dump de plusieurs gigaoctets
+- [x] ~~Le nettoyeur de wikitexte n'a jamais vu de vrai dump~~ — confronté le
+      29/07 aux 1 000 premiers articles de frwiki. 6,6 % des documents portaient
+      une trace de balisage ; trois défauts corrigés, tous invisibles sur des
+      fragments bien formés : un bloc jamais refermé emportait la fin de
+      l'article, modèles et tableaux imbriqués l'un dans l'autre étaient coupés,
+      et une longue rafale d'apostrophes laissait des débris
+- [ ] Refaire le contrôle sur un échantillon plus large (10 000 articles) après
+      correction, puis sur la conversion complète
 - [ ] `futo data telecharger` n'affiche qu'une marche à suivre pour les sources
       autres que Wikipédia — volontaire tant que leurs identifiants ne sont pas
       vérifiés
@@ -124,7 +129,7 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 | Fertilité du tokenizer | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
 | Mots rendus en un seul token | 62,6 % | idem |
 | Aller-retour tokenizer | exact | accents, ligatures, guillemets, émojis, code |
-| Suite de tests | 266 tests, 17 s | 4 cœurs, hors ligne |
+| Suite de tests | 272 tests, 17 s | 4 cœurs, hors ligne |
 | Suite de tests | 14 s (190 tests à la date de la mesure) | Apple M2 Max |
 | Débit `futo-tiny` | 57 000-60 000 tokens/s | **Apple M2 Max**, MPS, fp32 |
 | Entraînement `futo-tiny` | 400 pas en 15,6 s | **Apple M2 Max**, MPS, fp32 |

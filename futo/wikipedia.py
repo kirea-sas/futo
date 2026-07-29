@@ -82,6 +82,14 @@ _MOTIF_LIGNES_VIDES = re.compile(r"\n{3,}")
 # et il ne faut surtout pas y toucher.
 _MOTIF_ESPACE_AVANT_POINT = re.compile(r"[ \t]+([.,])")
 
+# Filet de sécurité, appliqué en dernier. Une ligne de français ne commence
+# jamais par « | » ni par « ! » : ce sont des lignes de tableau dont le
+# « {| » d'ouverture a été perdu. Et les débris de balisage — accolades,
+# crochets doubles — ne sont jamais du texte. On les retire plutôt que de
+# les laisser au modèle, qui apprendrait à les reproduire.
+_MOTIF_LIGNE_TABLEAU = re.compile(r"^[|!].*$", re.MULTILINE)
+_MOTIF_DEBRIS = re.compile(r"\{\{|\}\}|\{\||\|\}|\[\[|\]\]")
+
 # Préfixes de liens qu'on supprime entièrement, avec leur légende : ce sont des
 # médias ou des métadonnées, pas du texte d'article. Les formes anglaises
 # coexistent avec les françaises dans les dumps.
@@ -110,8 +118,11 @@ def _reduire_apostrophes(correspondance: re.Match) -> str:
     « L'histoire » en « Lhistoire ». Sur un corpus français, où l'élision est
     partout, cette perte est loin d'être anodine.
 
-    Règle appliquée : 2, 3 et 5 apostrophes sont du balisage pur ; au-delà,
-    l'excédent est rendu au texte — quatre donnent donc une apostrophe.
+    Règle appliquée : 2, 3 et 5 apostrophes sont du balisage pur ; 4 en rendent
+    une au texte ; **au-delà de 5, on n'en rend qu'une seule**. MediaWiki en
+    rendrait n − 5, mais deux apostrophes consécutives ne sont jamais du
+    français : une suite de huit laissait ainsi trois apostrophes en plein
+    texte, repérées comme balisage résiduel sur le vrai dump.
 
     Conséquence assumée : dans `L''''Église''''`, la suite FERMANTE rend elle
     aussi son excédent, et l'on obtient `L'Église'`. On préfère cette
@@ -124,35 +135,7 @@ def _reduire_apostrophes(correspondance: re.Match) -> str:
         return ""
     if n == 4:
         return "'"
-    return "'" * (n - 5)
-
-
-def _supprimer_imbriques(texte: str, ouvrant: str, fermant: str) -> str:
-    """Supprime les blocs `ouvrant … fermant`, imbrications comprises.
-
-    Une expression régulière ne sait pas compter les niveaux : sur
-    `{{Infobox|{{date|1|1|2000}}}}`, elle s'arrête au premier `}}` et laisse
-    traîner `}}`. Ce petit automate compte la profondeur et fait le travail
-    correctement.
-    """
-    resultat: list[str] = []
-    profondeur = 0
-    i = 0
-    n = len(texte)
-    lo, lf = len(ouvrant), len(fermant)
-
-    while i < n:
-        if texte.startswith(ouvrant, i):
-            profondeur += 1
-            i += lo
-        elif profondeur > 0 and texte.startswith(fermant, i):
-            profondeur -= 1
-            i += lf
-        else:
-            if profondeur == 0:
-                resultat.append(texte[i])
-            i += 1
-    return "".join(resultat)
+    return "'"  # 6 et plus : une seule, jamais une rafale
 
 
 def _traiter_liens_internes(texte: str) -> str:
@@ -203,6 +186,59 @@ def _traiter_liens_internes(texte: str) -> str:
     return "".join(resultat)
 
 
+def _supprimer_blocs_wiki(texte: str) -> str:
+    """Supprime modèles `{{…}}` et tableaux `{|…|}` en une seule passe.
+
+    Deux défauts d'une version antérieure, tous deux révélés par un vrai dump
+    et invisibles sur des fragments écrits à la main :
+
+    **Un bloc jamais refermé emportait tout le reste de l'article.** Traiter les
+    tableaux puis les modèles avec un simple compteur de profondeur revient à
+    supposer que le wikitexte est bien formé. Il ne l'est pas : sur des millions
+    d'articles édités à la main, il y a des `{{` orphelins. Le compteur ne
+    revenait alors jamais à zéro et la fin du document disparaissait.
+
+    **Modèles et tableaux s'imbriquent l'un dans l'autre.** Les traiter en deux
+    passes séparées coupe les paires croisées et laisse des fermetures
+    orphelines — les `}}` et `|}` isolés qu'on retrouvait dans le texte final.
+
+    D'où cette passe unique, avec une pile qui sait ce qu'elle a ouvert, et une
+    règle prudente : **on ne supprime que les blocs effectivement refermés**.
+    Un bloc orphelin est laissé tel quel ; le filet de sécurité en fin de
+    nettoyage se charge de ses débris. Mieux vaut un `{{` résiduel qu'un
+    paragraphe manquant.
+    """
+    plages: list[tuple[int, int]] = []  # blocs de plus haut niveau, bien fermés
+    pile: list[tuple[int, str]] = []
+    i, n = 0, len(texte)
+
+    while i < n:
+        if texte.startswith("{{", i):
+            pile.append((i, "}}"))
+            i += 2
+        elif texte.startswith("{|", i):
+            pile.append((i, "|}"))
+            i += 2
+        elif pile and texte.startswith(pile[-1][1], i):
+            debut, fermeture = pile.pop()
+            i += len(fermeture)
+            if not pile:  # bloc complet, au plus haut niveau
+                plages.append((debut, i))
+        else:
+            i += 1
+
+    if not plages:
+        return texte
+
+    morceaux: list[str] = []
+    precedent = 0
+    for debut, fin in plages:
+        morceaux.append(texte[precedent:debut])
+        precedent = fin
+    morceaux.append(texte[precedent:])
+    return "".join(morceaux)
+
+
 def _couper_sections_finales(texte: str) -> str:
     """Tronque l'article à la première section de références ou de liens."""
     lignes = texte.split("\n")
@@ -229,10 +265,9 @@ def nettoyer_wikitexte(brut: str) -> str:
     texte = _MOTIF_BALISES_PLEINES.sub("", texte)
     texte = _MOTIF_BALISES_VIDES.sub("", texte)
 
-    # 2. Tableaux, puis modèles. Les tableaux d'abord : ils contiennent souvent
-    #    des modèles, et l'inverse est plus rare.
-    texte = _supprimer_imbriques(texte, "{|", "|}")
-    texte = _supprimer_imbriques(texte, "{{", "}}")
+    # 2. Modèles et tableaux, en UNE passe : ils s'imbriquent l'un dans l'autre,
+    #    et les traiter séparément coupe les paires croisées.
+    texte = _supprimer_blocs_wiki(texte)
 
     # 3. Sections de fin (références, liens externes…), tant que les titres
     #    sont encore reconnaissables.
@@ -251,7 +286,11 @@ def nettoyer_wikitexte(brut: str) -> str:
     texte = _MOTIF_BALISE_HTML.sub("", texte)
     texte = html.unescape(texte)
 
-    # 7. Mise au propre finale.
+    # 7. Filet de sécurité : ce qui a survécu au balisage n'est pas du français.
+    texte = _MOTIF_LIGNE_TABLEAU.sub("", texte)
+    texte = _MOTIF_DEBRIS.sub("", texte)
+
+    # 8. Mise au propre finale.
     texte = _MOTIF_ESPACES.sub(" ", texte)
     texte = _MOTIF_ESPACE_AVANT_POINT.sub(r"\1", texte)
     lignes = [ligne.strip() for ligne in texte.split("\n")]

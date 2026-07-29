@@ -37,19 +37,24 @@ __all__ = ["Controle", "controler_corpus", "TRACES_DE_BALISAGE"]
 # Ce qui ne devrait jamais survivre à un nettoyage correct. Chaque motif est
 # accompagné de ce qu'il révèle, pour que le rapport soit actionnable plutôt
 # que décoratif.
-TRACES_DE_BALISAGE: list[tuple[str, str, str]] = [
-    ("modele_ouvrant", r"\{\{", "modèle non supprimé — imbrication mal gérée"),
-    ("modele_fermant", r"\}\}", "fermeture de modèle orpheline"),
-    ("lien_ouvrant", r"\[\[", "lien interne non traité"),
-    ("lien_fermant", r"\]\]", "fermeture de lien orpheline"),
-    ("tableau", r"\{\||\|\}", "tableau non supprimé"),
-    ("balise_ref", r"<ref[\s/>]", "référence non supprimée"),
-    ("balise_html", r"</?(?:div|span|table|tr|td|br|small|sup|sub)\b", "HTML résiduel"),
-    ("entite_html", r"&(?:nbsp|amp|lt|gt|quot|#\d+);", "entité HTML non décodée"),
-    ("gras_italique", r"'{3,}", "balisage de gras non retiré"),
-    ("titre_wiki", r"^={2,}.*={2,}$", "titre de section non converti"),
-    ("url_nue", r"https?://\S{10,}", "adresse laissée telle quelle"),
+# Le quatrième champ dit si la trace compte dans le VERDICT. Certaines sont
+# informatives : une adresse ou une entité « &amp; » peut figurer légitimement
+# dans un article — celui qui parle du HTML, par exemple. Les faire échouer un
+# corpus reviendrait à crier au loup.
+TRACES_DE_BALISAGE: list[tuple[str, str, str, bool]] = [
+    ("modele_ouvrant", r"\{\{", "modèle non supprimé — imbrication mal gérée", True),
+    ("modele_fermant", r"\}\}", "fermeture de modèle orpheline", True),
+    ("lien_ouvrant", r"\[\[", "lien interne non traité", True),
+    ("lien_fermant", r"\]\]", "fermeture de lien orpheline", True),
+    ("tableau", r"\{\||\|\}", "tableau non supprimé", True),
+    ("balise_ref", r"<ref[\s/>]", "référence non supprimée", True),
+    ("balise_html", r"</?(?:div|span|table|tr|td|br|small|sup|sub)\b", "HTML résiduel", True),
+    ("gras_italique", r"'{3,}", "balisage de gras non retiré", True),
+    ("titre_wiki", r"^={2,}.*={2,}$", "titre de section non converti", True),
+    ("entite_html", r"&(?:nbsp|amp|lt|gt|quot|#\d+);", "entité HTML non décodée", False),
+    ("url_nue", r"https?://\S{10,}", "adresse laissée telle quelle", False),
 ]
+_COMPTE_AU_VERDICT = {cle for cle, _, _, compte in TRACES_DE_BALISAGE if compte}
 
 # Marqueurs du français, pour repérer un corpus qui n'en serait pas.
 _ACCENTS = "àâäéèêëîïôöùûüÿçÀÂÄÉÈÊËÎÏÔÖÙÛÜŸÇ"
@@ -93,10 +98,18 @@ class Controle:
 
     @property
     def part_touchee(self) -> float:
-        """Part des documents portant au moins une trace de balisage."""
+        """Part des documents portant une trace de balisage qui compte.
+
+        Les traces informatives — adresses, entités HTML — sont comptées et
+        affichées, mais n'entrent pas dans le verdict : elles peuvent figurer
+        légitimement dans un article.
+        """
         if not self.n_documents:
             return 0.0
-        return max(self.docs_touches.values(), default=0) / self.n_documents
+        pertinents = [
+            n for cle, n in self.docs_touches.items() if cle in _COMPTE_AU_VERDICT
+        ]
+        return max(pertinents, default=0) / self.n_documents
 
     def verdict(self) -> tuple[bool, str]:
         """Peut-on entraîner là-dessus ?
@@ -160,7 +173,9 @@ class Controle:
             lignes.append("  aucune.")
         else:
             for cle, nombre in sorted(restes.items(), key=lambda kv: -kv[1]):
-                description = next(d for c, _, d in TRACES_DE_BALISAGE if c == cle)
+                description = next(d for c, _, d, _ in TRACES_DE_BALISAGE if c == cle)
+                if cle not in _COMPTE_AU_VERDICT:
+                    description += " (informatif)"
                 docs = self.docs_touches.get(cle, 0)
                 lignes.append(
                     f"  {cle:<16} {_milliers(nombre):>9} occurrence(s) dans "
@@ -224,7 +239,8 @@ def controler_corpus(
     conversion complète.
     """
     motifs = [
-        (cle, re.compile(expression, re.MULTILINE)) for cle, expression, _ in TRACES_DE_BALISAGE
+        (cle, re.compile(expression, re.MULTILINE))
+        for cle, expression, _, _ in TRACES_DE_BALISAGE
     ]
     traces: Counter[str] = Counter()
     docs_touches: Counter[str] = Counter()

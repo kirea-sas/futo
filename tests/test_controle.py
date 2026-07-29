@@ -202,6 +202,7 @@ def test_les_documents_trop_courts_ne_sont_pas_donnes_en_exemple(tmp_path):
 
 def test_chaque_trace_a_une_description():
     """Un rapport doit être actionnable : chaque motif explique ce qu'il révèle."""
-    for cle, expression, description in TRACES_DE_BALISAGE:
+    for cle, expression, description, compte in TRACES_DE_BALISAGE:
         assert cle and expression and description
+        assert isinstance(compte, bool)
         assert len(description) > 10, f"{cle} : description trop vague"

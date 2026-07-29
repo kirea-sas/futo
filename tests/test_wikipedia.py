@@ -488,3 +488,93 @@ def test_le_dump_telecharge_est_lisible(serveur, tmp_path):
     telecharger_dump(serveur, cible, journal=None)
     resultat = convertir_dump(cible, tmp_path / "corpus.jsonl", journal=None)
     assert resultat.n_articles == 1
+
+
+# --------------------------------------------------------------------------- #
+# Non-régression : les défauts trouvés sur le vrai dump francophone
+# --------------------------------------------------------------------------- #
+#
+# Ces cas viennent d'un contrôle réel sur les 1 000 premiers articles de
+# frwiki : 6,6 % des documents portaient une trace de balisage. Aucun n'était
+# reproductible sur les fragments écrits à la main — ils supposaient tous un
+# wikitexte bien formé, ce que des millions d'articles édités à la main ne sont
+# évidemment pas.
+
+
+def test_un_bloc_jamais_referme_nemporte_pas_larticle():
+    """LE défaut sérieux : un `{{` orphelin faisait disparaître la suite.
+
+    Le compteur de profondeur ne revenait jamais à zéro, et tout ce qui suivait
+    était considéré comme faisant partie du modèle. Sur un dump réel, où les
+    accolades orphelines sont courantes, des articles entiers étaient amputés
+    sans que rien ne le signale.
+    """
+    brut = (
+        "Le premier paragraphe, bien réel.\n\n"
+        "{{Infobox jamais refermée\n\n"
+        "Le second paragraphe, qui ne doit surtout pas disparaître."
+    )
+    resultat = nettoyer_wikitexte(brut)
+    assert "Le premier paragraphe" in resultat
+    assert "Le second paragraphe, qui ne doit surtout pas disparaître." in resultat
+
+
+def test_modeles_et_tableaux_simbriquent_dans_les_deux_sens():
+    """Les traiter en deux passes coupait les paires croisées."""
+    assert nettoyer_wikitexte("{|\n| {{formatnum:1234}}\n|}\nTexte.") == "Texte."
+    assert nettoyer_wikitexte("{{Infobox|carte={|\n|a\n|}\n}}Texte.") == "Texte."
+
+
+def test_lignes_de_tableau_orphelines_sont_retirees():
+    """Cas relevé sur frwiki : des lignes de tableau dont le `{|` était perdu.
+
+    Une ligne de français ne commence jamais par « | » ni par « ! ».
+    """
+    brut = '|0-14 |28189|27287\n|width="50%"|\n!En-tête\nRépartition par catégories.'
+    assert nettoyer_wikitexte(brut) == "Répartition par catégories."
+
+
+def test_debris_de_balisage_ne_survivent_pas():
+    """Filet de sécurité : accolades et crochets doubles résiduels sont retirés.
+
+    Les laisser reviendrait à apprendre au modèle à les reproduire.
+    """
+    for brut in (
+        "les ruines du château.|group= Note}}, vraisemblablement là.",
+        "les manettes.]]\n\nLa superficie est connue.",
+        "Texte [[ orphelin et }} isolé.",
+    ):
+        resultat = nettoyer_wikitexte(brut)
+        for debris in ("{{", "}}", "[[", "]]", "{|", "|}"):
+            assert debris not in resultat, f"« {debris} » a survécu : {resultat!r}"
+
+
+def test_longue_rafale_dapostrophes_ne_laisse_quune_apostrophe():
+    """Huit apostrophes laissaient trois apostrophes en plein texte.
+
+    MediaWiki en rendrait n − 5 ; mais deux apostrophes consécutives ne sont
+    jamais du français, et le contrôle les repérait comme du balisage résiduel.
+    """
+    q = "'"
+    resultat = nettoyer_wikitexte("SPQR est " + q * 8 + "SPQR" + q * 8 + " en latin.")
+    assert q * 2 not in resultat, f"rafale d'apostrophes restante : {resultat!r}"
+
+
+def test_un_article_realiste_ressort_propre():
+    """Contrôle de bout en bout, sur un article qui cumule les difficultés."""
+
+    brut = (
+        "{{Infobox Commune|nom=Sarmiane|population={{formatnum:12345}}}}\n"
+        "'''Sarmiane''' est une commune française<ref>Une note</ref>, "
+        "située au confluent de deux rivières.\n\n"
+        "== Démographie ==\n"
+        "{|class=\"wikitable\"\n! Année !! Habitants\n| 1999 || 11 000\n|}\n"
+        "L'évolution est régulière depuis [[1999]].\n\n"
+        "== Voir aussi ==\n* [[Autre commune]]\n"
+    )
+    resultat = nettoyer_wikitexte(brut)
+    assert "Sarmiane est une commune française, située" in resultat
+    assert "L'évolution est régulière depuis 1999." in resultat
+    assert "Voir aussi" not in resultat
+    for debris in ("{{", "}}", "[[", "]]", "{|", "|}", "<ref", "'''"):
+        assert debris not in resultat, f"« {debris} » a survécu : {resultat!r}"
