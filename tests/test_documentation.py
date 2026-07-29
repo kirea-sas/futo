@@ -143,6 +143,42 @@ def test_le_readme_cite_toutes_les_configurations():
         assert nom in readme or "docs/" in readme, f"{nom} est introuvable depuis le README."
 
 
+def test_la_licence_des_poids_est_tranchee_et_coherente():
+    """La licence des poids doit être décidée, et dite partout pareil.
+
+    Une licence tranchée mais non écrite ne vaut rien, et une licence écrite
+    différemment selon les documents vaut pire que rien. Le choix — CC BY-SA 4.0,
+    reprise de celle de Wikipédia — doit apparaître dans le README comme dans la
+    carte du modèle, et aucun document ne doit encore le présenter comme ouvert.
+    """
+    readme = (RACINE / "README.md").read_text(encoding="utf-8")
+    carte = (RACINE / "docs" / "CARTE-DU-MODELE.md").read_text(encoding="utf-8")
+
+    for nom, contenu in (("README.md", readme), ("CARTE-DU-MODELE.md", carte)):
+        assert "CC BY-SA 4.0" in contenu, f"{nom} ne dit pas la licence des poids."
+
+    # Le code, lui, reste sous Apache 2.0 : les deux doivent coexister sans
+    # que l'un soit pris pour l'autre.
+    assert "Apache 2.0" in readme
+
+    # Plus aucune formulation en suspens.
+    for nom, contenu in (("README.md", readme), ("CARTE-DU-MODELE.md", carte),
+                         ("DONNEES.md", (RACINE / "docs" / "DONNEES.md").read_text(encoding="utf-8"))):
+        for en_suspens in ("à trancher selon", "non tranché ;"):
+            assert en_suspens not in contenu, (
+                f"{nom} présente encore la licence des poids comme ouverte "
+                f"(« {en_suspens} »), alors qu'elle est décidée."
+            )
+
+    # La valeur par défaut du journal des sources doit suivre la même licence.
+    import inspect
+
+    from futo.wikipedia import consigner_source
+
+    signature = inspect.signature(consigner_source)
+    assert signature.parameters["licence"].default == "CC BY-SA 4.0"
+
+
 def test_commandes_du_readme_existent_dans_la_cli():
     """Les sous-commandes citées dans le README doivent exister réellement.
 

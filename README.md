@@ -252,7 +252,7 @@ futo/
 configs/         les quatre tailles, plus les réglages communs
 data/echantillon/  142 Ko de français original, pour les tests hors ligne
 data/sondes/     les 72 paires minimales françaises
-tests/           234 tests, 17 s sur processeur, sans réseau
+tests/           235 tests, 17 s sur processeur, sans réseau
 docs/            architecture, données, carte du modèle, Mac
 ```
 
@@ -264,7 +264,7 @@ docs/            architecture, données, carte du modèle, Mac
 pytest
 ```
 
-234 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
+235 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
 ne vérifient pas des formes de tenseurs mais des propriétés qu'un modèle peut
 violer en silence :
 
@@ -308,7 +308,23 @@ Le corpus d'exemple de `data/echantillon/` a été **écrit pour ce dépôt** et
 suit la même licence. Aucun texte publié n'y a été repris : c'est un choix
 délibéré, il n'y a donc aucune question de droits à instruire.
 
-La licence des **poids** d'un futur modèle dépendra des corpus employés pour
-l'entraîner — Wikipédia en CC BY-SA n'impose pas les mêmes obligations qu'une
-extraction de Common Crawl. À trancher avant l'entraînement, pas après :
-voir [docs/DONNEES.md](docs/DONNEES.md).
+Les **poids** seront publiés sous **CC BY-SA 4.0**. Décision prise le 29/07,
+avant tout entraînement : le corpus de départ est la Wikipédia francophone, déjà
+sous CC BY-SA, et le projet est ouvert de bout en bout. Autant reprendre la
+licence des données plutôt que d'entretenir une ambiguïté juridique que
+personne n'a envie d'arbitrer.
+
+Deux licences, donc, et c'est volontaire :
+
+| Ce qui est publié | Licence | Ce que ça implique |
+|---|---|---|
+| Le code, les tests, la documentation | Apache 2.0 | usage libre, y compris commercial, clause de brevets explicite |
+| Le corpus d'exemple `data/echantillon/` | Apache 2.0 | écrit pour ce dépôt, aucun texte tiers repris |
+| Les **poids** des modèles | CC BY-SA 4.0 | usage commercial permis, **mais** attribution obligatoire et partage à l'identique |
+
+Concrètement, pour qui utilisera les poids : l'usage commercial est autorisé,
+il faut citer Wikipédia et ses contributeurs comme source d'entraînement, et
+toute redistribution — y compris d'un modèle affiné à partir des nôtres — doit
+rester en CC BY-SA. Le code, lui, reste utilisable sans aucune de ces
+contraintes : on peut réentraîner un modèle depuis d'autres données et le
+publier sous la licence de son choix.

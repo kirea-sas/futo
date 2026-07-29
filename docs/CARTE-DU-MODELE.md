@@ -20,7 +20,7 @@
 | Date de publication | `<AAAA-MM-JJ>` |
 | Éditeur | Kirea SAS |
 | Licence du code | Apache 2.0 |
-| Licence des poids | `<à trancher selon les corpus employés — voir plus bas>` |
+| Licence des poids | **CC BY-SA 4.0** (décidé le 29/07/2026) |
 | Contact | contact@kirea.fr |
 
 ## Architecture
@@ -135,16 +135,30 @@ d'un facteur cinq à dix.
 
 ## Licence des poids
 
-À trancher **avant** l'entraînement, pas après, car le choix dépend des corpus :
+**CC BY-SA 4.0.** Décidé le 29/07/2026, avant tout entraînement.
 
-- corpus entièrement permissifs → Apache 2.0, cohérent avec le code ;
-- présence significative de contenus en CC BY-SA (Wikipédia) → l'effet du
-  partage à l'identique sur des poids entraînés est un point juridique non
-  tranché. Deux options défendables : publier sous CC BY-SA par prudence, ou
-  documenter précisément la position retenue.
+Le raisonnement : le corpus de départ est la Wikipédia francophone, déjà sous
+CC BY-SA, et l'effet du partage à l'identique sur des poids entraînés n'est pas
+tranché juridiquement. Plutôt que d'entretenir une ambiguïté, on reprend la
+licence des données. Le projet étant ouvert de bout en bout, cela ne coûte rien.
 
-Dans tous les cas, la liste des sources ci-dessus doit être publiée avec les
-poids.
+Ce que cela impose à qui utilise les poids :
+
+- l'usage **commercial est autorisé** — CC BY-SA ne l'interdit pas ;
+- l'**attribution** est obligatoire : citer Wikipédia et ses contributeurs
+  comme source d'entraînement, avec la version du dump employée ;
+- le **partage à l'identique** s'applique : redistribuer les poids, ou un
+  modèle affiné à partir d'eux, impose la même licence.
+
+Le code reste sous Apache 2.0 et n'est pas concerné : on peut réentraîner
+depuis d'autres données et publier sous la licence de son choix.
+
+La liste des sources ci-dessus doit être publiée avec les poids. Mention
+d'attribution à reprendre telle quelle :
+
+> Ce modèle a été entraîné sur la Wikipédia francophone (dump `<version>`),
+> © ses contributeurs, sous licence CC BY-SA 4.0.
+> Les poids sont publiés sous la même licence.
 
 ## Reproduire
 

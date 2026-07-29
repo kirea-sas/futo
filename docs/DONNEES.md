@@ -68,10 +68,16 @@ typographiques, ligatures, guillemets et espaces insécables. Il est testé sur
 des fragments écrits à la main, **jamais sur un vrai dump** — les surprises
 viendront de là.
 
-**Attention à la licence** : CC BY-SA impose l'attribution *et* le partage à
-l'identique. Son effet sur la licence des poids entraînés est un point juridique
-non tranché ; si vous voulez publier des poids sous Apache 2.0 sans discussion
-possible, c'est un sujet à instruire **avant** l'entraînement, pas après.
+**La licence est tranchée** : CC BY-SA impose l'attribution et le partage à
+l'identique, et l'effet sur des poids entraînés n'est pas clair juridiquement.
+Décision prise le 29/07/2026, avant tout entraînement : **les poids de Futo
+seront publiés sous CC BY-SA 4.0**, comme les données. L'usage commercial reste
+permis ; l'attribution et le partage à l'identique s'imposent à qui redistribue.
+Le code reste sous Apache 2.0. Voir [CARTE-DU-MODELE.md](CARTE-DU-MODELE.md).
+
+Conséquence pour les autres sources : si l'on ajoute un jour un corpus dont la
+licence est incompatible avec CC BY-SA, il faudra le vérifier avant de le
+mélanger, pas après.
 
 **Wikisource, Gallica, Projet Gutenberg** **[À VÉRIFIER]** — littérature du
 domaine public. Excellent français, mais daté : un modèle nourri

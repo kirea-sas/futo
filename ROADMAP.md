@@ -17,7 +17,7 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 - [x] Prise en charge du Mac (MPS) : détection de la puce, précision mixte
       essayée puis repli annoncé, configuration `futo-mac` — voir docs/MAC.md
 - [x] Corpus d'exemple original de 142 Ko, licence propre, pour les tests hors ligne
-- [x] 234 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
+- [x] 235 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
       et le démarrage du README rejoué depuis un clone neuf dans un
       environnement virtuel vierge, jusqu'à la génération de texte,
       dont des tests de la DOCUMENTATION : les blocs de commandes doivent
@@ -37,8 +37,9 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
 - [ ] Lancer la conversion sur le vrai dump francophone et mesurer le volume
       réel en tokens — l'estimation « à peu près la bonne taille pour futo-mac »
       n'est pas vérifiée
-- [ ] **Trancher la licence CC BY-SA** avant d'entraîner quoi que ce soit sur
-      Wikipédia : l'effet du partage à l'identique sur des poids n'est pas tranché
+- [x] **Licence des poids tranchée** (29/07) : CC BY-SA 4.0, comme les données
+      de Wikipédia. Usage commercial permis, attribution et partage à
+      l'identique obligatoires. Le code reste en Apache 2.0
 - [ ] Choisir les autres sources et **vérifier chaque identifiant et chaque
       licence** (mentions [À VÉRIFIER] dans [docs/DONNEES.md](docs/DONNEES.md))
 - [ ] Tenir `data/SOURCES.md` dès le premier téléchargement — exigé par le
@@ -62,8 +63,8 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
 - [ ] Comparer 3 à 4 mélanges de corpus à cette échelle avant de passer à la suite
 - [ ] Carte du modèle honnête : données, limites, biais, empreinte carbone
       (voir [docs/CARTE-DU-MODELE.md](docs/CARTE-DU-MODELE.md))
-- [ ] Décider de la licence des poids **avant** l'entraînement, en fonction des
-      corpus retenus
+- [x] ~~Décider de la licence des poids avant l'entraînement~~ — fait le 29/07 :
+      CC BY-SA 4.0
 
 ## ⬜ Plus tard
 
@@ -115,7 +116,7 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 | Fertilité du tokenizer | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
 | Mots rendus en un seul token | 62,6 % | idem |
 | Aller-retour tokenizer | exact | accents, ligatures, guillemets, émojis, code |
-| Suite de tests | 234 tests, 17 s | 4 cœurs, hors ligne |
+| Suite de tests | 235 tests, 17 s | 4 cœurs, hors ligne |
 | Suite de tests | 14 s (190 tests à la date de la mesure) | Apple M2 Max |
 | Débit `futo-tiny` | 57 000-60 000 tokens/s | **Apple M2 Max**, MPS, fp32 |
 | Entraînement `futo-tiny` | 400 pas en 15,6 s | **Apple M2 Max**, MPS, fp32 |
