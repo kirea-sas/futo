@@ -89,10 +89,14 @@ def test_pas_despace_parasite_devant_le_point():
     Mais la typographie française exige une espace insécable devant
     « ; : ! ? » et à l'intérieur des guillemets : elle doit survivre intacte.
     """
-    assert nettoyer_wikitexte("Il commence avant {{date|43}}.") == "Il commence avant."
+    # Un modèle SUPPRIMÉ — pas un de ceux dont le texte est rendu, sinon il
+    # ne laisserait aucune espace derrière lui.
+    assert nettoyer_wikitexte("Il commence avant {{Palette Rome}}.") == "Il commence avant."
     assert nettoyer_wikitexte("Trois villes {{liste}}, dont Lyon.") == (
         "Trois villes, dont Lyon."
     )
+    # Et un modèle RENDU garde bien son espace : « avant 43. », pas « avant43. ».
+    assert nettoyer_wikitexte("Il commence avant {{date|43}}.") == "Il commence avant 43."
     insecable = "\u00a0"
     for signe in (";", ":", "!", "?"):
         phrase = "Vraiment" + insecable + signe + " oui"
@@ -578,3 +582,62 @@ def test_un_article_realiste_ressort_propre():
     assert "Voir aussi" not in resultat
     for debris in ("{{", "}}", "[[", "]]", "{|", "|}", "<ref", "'''"):
         assert debris not in resultat, f"« {debris} » a survécu : {resultat!r}"
+
+
+def test_titres_consecutifs_ne_sont_pas_colles():
+    """« == Biographie == » puis « === Enfance === » doit rester sur deux lignes.
+
+    Avec un espacement gourmand incluant le saut de ligne, la fin du motif de
+    titre avalait le retour à la ligne et le titre suivant avalait celui de la
+    ligne vide : le texte ressortait en « BiographieEnfance ». Relevé sur
+    l'article Antoine Meillet de frwiki.
+    """
+    for brut in (
+        "== Biographie ==\n\n=== Enfance et formation ===\nTexte.",
+        "== Biographie ==\n=== Enfance et formation ===\nTexte.",
+        "==Biographie==\n\n\n===Enfance et formation===\nTexte.",
+    ):
+        resultat = nettoyer_wikitexte(brut)
+        assert "BiographieEnfance" not in resultat, f"titres collés : {resultat!r}"
+        assert "Biographie" in resultat and "Enfance et formation" in resultat
+
+
+def test_les_modeles_porteurs_de_texte_sont_rendus():
+    """Supprimer un modèle de date casse la phrase.
+
+    « né le {{date|11|novembre|1866}} à Moulins » devenait « né le à Moulins » :
+    du français agrammatical, que le modèle apprendrait tel quel. Relevé sur
+    l'article Antoine Meillet.
+    """
+    assert nettoyer_wikitexte(
+        "Antoine Meillet, né le {{date|11|novembre|1866}} à Moulins, est un philologue."
+    ) == "Antoine Meillet, né le 11 novembre 1866 à Moulins, est un philologue."
+
+    assert nettoyer_wikitexte("des décennies du {{s-|XX|e}}.") == "des décennies du XXe siècle."
+    assert nettoyer_wikitexte("Il cite {{lang|en|machine learning}} souvent.") == (
+        "Il cite machine learning souvent."
+    )
+    assert "12345" in nettoyer_wikitexte("La ville compte {{formatnum:12345}} habitants.")
+    assert "10" in nettoyer_wikitexte("Une distance de {{unité|10|km}}.")
+
+
+def test_les_modeles_inconnus_restent_supprimes():
+    """La liste des modèles rendus est courte et fermée : tout le reste part."""
+    assert nettoyer_wikitexte("Un modèle {{Palette Truc|a|b}} inconnu.") == (
+        "Un modèle inconnu."
+    )
+    assert nettoyer_wikitexte("{{Infobox Commune|nom=X|population=1000}}Texte.") == "Texte."
+
+
+def test_un_modele_rendu_dans_un_modele_supprime_disparait_aussi():
+    """Le rendu se fait de l'intérieur vers l'extérieur : une date logée dans une
+    infobox ne doit pas se retrouver seule dans le texte."""
+    resultat = nettoyer_wikitexte("{{Infobox|naissance={{date|1|1|1900}}}}Le texte.")
+    assert resultat == "Le texte."
+    assert "1900" not in resultat
+
+
+def test_le_rendu_des_modeles_ne_boucle_pas():
+    """Un wikitexte cassé ne doit pas faire tourner la boucle indéfiniment."""
+    assert isinstance(nettoyer_wikitexte("{{a{{b{{c" * 50), str)
+    assert isinstance(nettoyer_wikitexte("{{" * 200 + "}}" * 200), str)

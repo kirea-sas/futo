@@ -68,7 +68,12 @@ _MOTIF_BALISES_PLEINES = re.compile(
 )
 _MOTIF_BALISE_HTML = re.compile(r"</?[a-zA-Z][a-zA-Z0-9]*\b[^>]*/?>")
 _MOTIF_LIEN_EXTERNE = re.compile(r"\[(?:https?:|ftp:|//)[^\s\]]+\s*([^\]]*)\]")
-_MOTIF_TITRE = re.compile(r"^\s*(={2,6})\s*(.*?)\s*\1\s*$", re.MULTILINE)
+# Titres de section. Les espacements admis sont HORIZONTAUX seulement.
+# Avec un espacement gourmand incluant le saut de ligne, la fin du motif
+# avalait le retour à la ligne et le titre suivant avalait celui de la ligne
+# vide : « == Biographie == » suivi de « === Enfance === » ressortait collé,
+# en « BiographieEnfance ». Relevé sur un vrai article de frwiki.
+_MOTIF_TITRE = re.compile(r"^[ \t]*(={2,6})[ \t]*(.*?)[ \t]*\1[ \t]*$", re.MULTILINE)
 _MOTIF_APOSTROPHES = re.compile(r"'{2,}")
 
 
@@ -104,6 +109,68 @@ _SECTIONS_FINALES = {
     "voir aussi", "notes et références", "notes", "références", "liens externes",
     "bibliographie", "annexes", "articles connexes", "sources", "pour approfondir",
 }
+
+
+# Modèles dont le CONTENU est du texte : les supprimer casse la phrase.
+# « né le {{date|11|novembre|1866}} à Moulins » devenait « né le à Moulins » —
+# du français agrammatical, que le modèle apprendrait tel quel. Relevé sur
+# frwiki dans l'article Antoine Meillet.
+#
+# La liste est volontairement courte : seulement les modèles très fréquents
+# dont on sait rendre le texte sans risque. Tous les autres restent supprimés.
+_MOTIF_MODELE_SIMPLE = re.compile(r"\{\{([^{}]*)\}\}")
+
+
+def _rendre_modele(correspondance: re.Match) -> str:
+    """Rend en texte les quelques modèles qui portent du sens, supprime le reste.
+
+    Appliqué aux modèles les plus INTÉRIEURS d'abord, puis répété : un modèle
+    imbriqué dans un autre est donc rendu avant que l'extérieur ne soit traité.
+    """
+    contenu = correspondance.group(1)
+    morceaux = [m.strip() for m in contenu.split("|")]
+    tete = morceaux[0]
+    # Les arguments nommés (clé=valeur) sont de la mise en forme, pas du texte.
+    positionnels = [m for m in morceaux[1:] if "=" not in m and m]
+
+    # {{formatnum:12345}} et consorts : le nom porte la valeur après « : ».
+    if ":" in tete:
+        nom, _, valeur = tete.partition(":")
+        nom = nom.strip().lower()
+        if nom in {"formatnum", "nombre", "unité", "unite"}:
+            return valeur.strip()
+        return ""
+
+    nom = tete.lower()
+
+    if nom in {"date", "date-", "date de naissance", "date de décès"}:
+        return " ".join(positionnels[:3])
+    if nom in {"s", "s-", "-s", "s2", "siècle", "siecle"}:
+        # {{s-|XX|e}} vaut « XXe siècle » ; l'exposant est « e » par défaut.
+        if not positionnels:
+            return ""
+        exposant = positionnels[1] if len(positionnels) > 1 else "e"
+        return f"{positionnels[0]}{exposant} siècle"
+    if nom in {"unité", "unite", "nombre", "nb", "num", "formatnum"}:
+        return "\u00a0".join(positionnels)
+    if nom in {"lang", "langue", "lang-en", "en"}:
+        return positionnels[-1] if positionnels else ""
+    if nom in {"citation", "guil", "citation bloc"}:
+        return f"«\u00a0{positionnels[0]}\u00a0»" if positionnels else ""
+    if nom in {"nobr", "nowrap", "abréviation", "abbr"}:
+        return positionnels[0] if positionnels else ""
+
+    return ""  # tout le reste : supprimé, comme avant
+
+
+def _rendre_modeles_connus(texte: str) -> str:
+    """Traite les modèles de l'intérieur vers l'extérieur, jusqu'à épuisement."""
+    for _ in range(12):  # borne de sûreté : un wikitexte cassé ne doit pas boucler
+        nouveau = _MOTIF_MODELE_SIMPLE.sub(_rendre_modele, texte)
+        if nouveau == texte:
+            return nouveau
+        texte = nouveau
+    return texte
 
 
 def _reduire_apostrophes(correspondance: re.Match) -> str:
@@ -265,32 +332,37 @@ def nettoyer_wikitexte(brut: str) -> str:
     texte = _MOTIF_BALISES_PLEINES.sub("", texte)
     texte = _MOTIF_BALISES_VIDES.sub("", texte)
 
-    # 2. Modèles et tableaux, en UNE passe : ils s'imbriquent l'un dans l'autre,
-    #    et les traiter séparément coupe les paires croisées.
+    # 2. Les modèles dont le contenu est du texte — dates, siècles, nombres,
+    #    unités — sont RENDUS ; les autres disparaissent. Traités de l'intérieur
+    #    vers l'extérieur, avant la suppression en bloc.
+    texte = _rendre_modeles_connus(texte)
+
+    # 3. Ce qui reste de modèles et de tableaux, en UNE passe : ils s'imbriquent
+    #    l'un dans l'autre, et les traiter séparément coupe les paires croisées.
     texte = _supprimer_blocs_wiki(texte)
 
-    # 3. Sections de fin (références, liens externes…), tant que les titres
+    # 4. Sections de fin (références, liens externes…), tant que les titres
     #    sont encore reconnaissables.
     texte = _couper_sections_finales(texte)
 
-    # 4. Liens internes, puis externes.
+    # 5. Liens internes, puis externes.
     texte = _traiter_liens_internes(texte)
     texte = _MOTIF_LIEN_EXTERNE.sub(r"\1", texte)
 
-    # 5. Typographie du wikitexte.
+    # 6. Typographie du wikitexte.
     texte = _MOTIF_TITRE.sub(r"\2", texte)
     texte = _MOTIF_APOSTROPHES.sub(_reduire_apostrophes, texte)
     texte = _MOTIF_PUCE.sub("", texte)
 
-    # 6. Ce qui reste de HTML, puis les entités.
+    # 7. Ce qui reste de HTML, puis les entités.
     texte = _MOTIF_BALISE_HTML.sub("", texte)
     texte = html.unescape(texte)
 
-    # 7. Filet de sécurité : ce qui a survécu au balisage n'est pas du français.
+    # 8. Filet de sécurité : ce qui a survécu au balisage n'est pas du français.
     texte = _MOTIF_LIGNE_TABLEAU.sub("", texte)
     texte = _MOTIF_DEBRIS.sub("", texte)
 
-    # 8. Mise au propre finale.
+    # 9. Mise au propre finale.
     texte = _MOTIF_ESPACES.sub(" ", texte)
     texte = _MOTIF_ESPACE_AVANT_POINT.sub(r"\1", texte)
     lignes = [ligne.strip() for ligne in texte.split("\n")]

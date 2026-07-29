@@ -17,7 +17,7 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 - [x] Prise en charge du Mac (MPS) : détection de la puce, précision mixte
       essayée puis repli annoncé, configuration `futo-mac` — voir docs/MAC.md
 - [x] Corpus d'exemple original de 142 Ko, licence propre, pour les tests hors ligne
-- [x] 274 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
+- [x] 279 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
       et le démarrage du README rejoué depuis un clone neuf dans un
       environnement virtuel vierge, jusqu'à la génération de texte,
       dont des tests de la DOCUMENTATION : les blocs de commandes doivent
@@ -98,8 +98,17 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
       fragments bien formés : un bloc jamais refermé emportait la fin de
       l'article, modèles et tableaux imbriqués l'un dans l'autre étaient coupés,
       et une longue rafale d'apostrophes laissait des débris
-- [ ] Refaire le contrôle sur un échantillon plus large (10 000 articles) après
-      correction, puis sur la conversion complète
+- [x] ~~Refaire le contrôle sur 10 000 articles~~ — fait le 29/07 : verdict
+      PROPRE, 0,02 % de documents portant une trace (4 occurrences dans 2
+      documents), contre 6,6 % avant correction. Deux défauts de CONTENU
+      trouvés à la lecture des extraits, invisibles pour les compteurs : les
+      titres de sections consécutives ressortaient collés, et les modèles de
+      date, de siècle, de nombre et d'unité étaient supprimés, ce qui laissait
+      « né le à Moulins » — du français agrammatical
+- [ ] Lancer la conversion COMPLÈTE et mesurer le volume réel en tokens.
+      Sur 10 000 articles : 145 Mo, 40,7 M tokens, médiane 6 424 caractères —
+      mais l'échantillon reste biaisé vers les articles les plus anciens, donc
+      les plus longs. L'extrapolation à 2,7 millions d'articles n'est pas fiable
 - [ ] `futo data telecharger` n'affiche qu'une marche à suivre pour les sources
       autres que Wikipédia — volontaire tant que leurs identifiants ne sont pas
       vérifiés
@@ -127,9 +136,12 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 | Mesure | Valeur | Conditions |
 |---|---|---|
 | Fertilité du tokenizer | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
+| **Rapport octets/token sur Wikipédia** | **3,56 octet/token** | mesuré sur 1 000 puis 10 000 articles réels |
+| Extraction Wikipédia | 10 000 articles → 145 Mo, 40,7 M tokens | dump frwiki, médiane 6 424 car. |
+| Propreté du corpus extrait | 0,02 % de documents avec une trace | après correction ; 6,6 % avant |
 | Mots rendus en un seul token | 62,6 % | idem |
 | Aller-retour tokenizer | exact | accents, ligatures, guillemets, émojis, code |
-| Suite de tests | 274 tests, 17 s | 4 cœurs, hors ligne |
+| Suite de tests | 279 tests, 17 s | 4 cœurs, hors ligne |
 | Suite de tests | 14 s (190 tests à la date de la mesure) | Apple M2 Max |
 | Débit `futo-tiny` | 57 000-60 000 tokens/s | **Apple M2 Max**, MPS, fp32 |
 | Entraînement `futo-tiny` | 400 pas en 15,6 s | **Apple M2 Max**, MPS, fp32 |
