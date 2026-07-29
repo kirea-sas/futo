@@ -21,7 +21,6 @@ from futo.data import ChargeurTokens
 from futo.model import Futo
 from futo.train import charger, entrainer, sauvegarder, taux_apprentissage
 
-
 # --------------------------------------------------------------------------- #
 # Est-ce que ça apprend ?
 # --------------------------------------------------------------------------- #
@@ -93,12 +92,10 @@ def test_lentrainement_complet_fait_baisser_la_perte(config_entrainement):
     # Le journal doit contenir des mesures exploitables.
     import json
 
-    lignes = [
-        json.loads(l)
-        for l in (resultat.dossier / "journal.jsonl").read_text(encoding="utf-8").splitlines()
-    ]
+    journal = (resultat.dossier / "journal.jsonl").read_text(encoding="utf-8")
+    lignes = [json.loads(ligne) for ligne in journal.splitlines()]
     assert lignes and "perte" in lignes[0]
-    pertes = [l["perte"] for l in lignes if "perte" in l]
+    pertes = [ligne["perte"] for ligne in lignes if "perte" in ligne]
     assert pertes[-1] < pertes[0], (
         f"La perte n'a pas baissé : {pertes[0]:.3f} → {pertes[-1]:.3f}"
     )

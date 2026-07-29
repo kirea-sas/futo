@@ -16,7 +16,6 @@ import torch
 from futo.config import ModelConfig
 from futo.model import CacheKV, Futo, appliquer_rope, construire_rope
 
-
 # --------------------------------------------------------------------------- #
 # Correction fondamentale
 # --------------------------------------------------------------------------- #
@@ -235,7 +234,8 @@ def test_groupes_de_parametres_excluent_les_normes(modele):
 
 def test_gqa_reduit_bien_les_parametres():
     """Passer de MHA à GQA doit réduire les projections K et V, pas Q ni O."""
-    commun = dict(vocab_size=100, block_size=16, n_layer=1, d_model=64, n_head=8)
+    commun = {"vocab_size": 100, "block_size": 16, "n_layer": 1,
+              "d_model": 64, "n_head": 8}
     mha = ModelConfig(n_kv_head=8, **commun)
     gqa = ModelConfig(n_kv_head=2, **commun)
     # Économie attendue : 2 × d_model × (8 − 2) × head_dim.
