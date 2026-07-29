@@ -15,9 +15,9 @@ jobs:
         python: ["3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -42,15 +42,10 @@ jobs:
         # réseau, il faut le corriger, pas ouvrir le pare-feu.
         run: pytest -q
 
-      - name: Vérifier que la chaîne complète tourne
-        run: |
-          futo tokenizer entrainer --corpus 'data/echantillon/*.txt' \
-                                   --vocab 2048 --silencieux
-          futo data preparer --corpus 'data/echantillon/*.txt' \
-                             --fraction-val 0.05 --tokens-par-shard 20000 \
-                             --silencieux
-          futo train configs/futo-tiny.yaml \
-                     --set model.vocab_size=2048 --set train.max_steps=20 \
-                     --set train.eval_every=0 --silencieux
-          futo eval sorties/tiny/dernier.pt --lots 2
-          futo generer sorties/tiny/dernier.pt --amorce "Bonjour" --max-tokens 10
+      - name: Chaîne complète
+        # AUCUNE commande écrite ici. Tout est dans le script, qui se lance à
+        # l'identique en local — c'est la seule façon de ne pas découvrir une
+        # faute de frappe après l'avoir poussée. Onze exécutions ont échoué
+        # d'affilée pour un « max_steps=20 » incompatible avec « warmup_steps=20 »,
+        # écrit directement dans ce fichier et donc jamais exécuté avant.
+        run: bash scripts/verifier-chaine.sh

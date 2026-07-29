@@ -179,6 +179,54 @@ def test_la_licence_des_poids_est_tranchee_et_coherente():
     assert signature.parameters["licence"].default == "CC BY-SA 4.0"
 
 
+def test_la_ci_nexecute_que_des_scripts_du_depot():
+    """Aucune commande `futo` ne doit être écrite directement dans le YAML de CI.
+
+    Une commande qui ne vit que dans un fichier de workflow n'est jamais lancée
+    avant d'être poussée. C'est ainsi que onze exécutions ont échoué d'affilée
+    sur un « --set train.max_steps=20 » incompatible avec le « warmup_steps: 20 »
+    de la configuration — faute visible en une seconde en local, invisible tant
+    qu'elle restait enfermée dans le YAML.
+
+    La règle : la CI n'appelle que `pytest`, `ruff` et des scripts de `scripts/`,
+    tous exécutables à l'identique sur une machine de développement.
+    """
+    workflow = RACINE / ".github" / "workflows" / "tests.yml"
+    assert workflow.exists(), "Le workflow d'intégration continue a disparu."
+
+    fautives = [
+        (numero, ligne.strip())
+        for numero, ligne in enumerate(workflow.read_text(encoding="utf-8").splitlines(), 1)
+        if ligne.strip().startswith("futo ")
+        or ligne.strip().startswith("run: futo ")
+    ]
+    assert not fautives, (
+        "Commandes futo écrites directement dans le workflow — elles doivent "
+        "passer par un script de scripts/ :\n"
+        + "\n".join(f"  ligne {n} : {c}" for n, c in fautives)
+    )
+
+    # Et les scripts appelés doivent exister.
+    import re as _re
+
+    for cible in _re.findall(r"bash (scripts/[\w.-]+)", workflow.read_text(encoding="utf-8")):
+        assert (RACINE / cible).exists(), f"Script de CI introuvable : {cible}"
+
+
+def test_les_scripts_sont_executables():
+    """Un script appelé par la CI doit avoir le bit d'exécution et un shebang."""
+    dossier = RACINE / "scripts"
+    if not dossier.exists():
+        return
+    for script in dossier.glob("*.sh"):
+        premiere = script.read_text(encoding="utf-8").splitlines()[0]
+        assert premiere.startswith("#!"), f"{script.name} n'a pas de shebang."
+        assert "set -euo pipefail" in script.read_text(encoding="utf-8"), (
+            f"{script.name} ne s'arrête pas à la première erreur : "
+            f"un échec au milieu passerait inaperçu."
+        )
+
+
 def test_commandes_du_readme_existent_dans_la_cli():
     """Les sous-commandes citées dans le README doivent exister réellement.
 
