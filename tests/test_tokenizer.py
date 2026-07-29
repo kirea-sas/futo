@@ -237,3 +237,66 @@ def test_fiche_ecrite_a_cote_du_tokenizer(tokenizer):
     assert contenu["normalisation"] == "NFC"
     assert contenu["motif_decoupe"] == MOTIF_FRANCAIS
     assert contenu["vocab_size"] == tokenizer.vocab_size
+
+
+def test_un_corpus_jsonl_nentraine_pas_le_tokenizer_sur_du_json(tmp_path):
+    """Le tokenizer doit lire le champ de texte, jamais la syntaxe JSON.
+
+    Défaut réel, attrapé au lancement sur les 7 Go de Wikipédia : le JSONL
+    était lu ligne à ligne, donc le BPE apprenait des tokens comme `{"text": "`
+    et `", "titre": "`. Ils auraient occupé le vocabulaire à la place du
+    français, et seraient revenus dans le texte généré.
+    """
+    import json as _json
+
+    from futo.tokenizer import entrainer_tokenizer
+
+    phrase = (
+        "L'histoire de Lyon commence bien avant notre ère, au confluent du "
+        "Rhône et de la Saône, et son cœur historique est classé. "
+    )
+    corpus = tmp_path / "corpus.jsonl"
+    corpus.write_text(
+        "\n".join(
+            _json.dumps({"text": phrase * 3, "titre": f"Article {i}"}, ensure_ascii=False)
+            for i in range(200)
+        ),
+        encoding="utf-8",
+    )
+
+    tok = entrainer_tokenizer([corpus], tmp_path / "t.json", vocab_size=600,
+                              frequence_min=2, verbeux=False)
+
+    # Chaque token est examiné SÉPARÉMENT : concaténer le vocabulaire ferait
+    # apparaître « titre » à cheval sur deux tokens voisins, et le test
+    # échouerait pour rien.
+    tokens = [tok.decoder([i], sauter_speciaux=False) for i in range(tok.vocab_size)]
+
+    # Le corpus français ne contient ni accolade ni guillemet droit : s'il en
+    # apparaît dans un token, ils viennent forcément de la syntaxe JSON.
+    parasites = [j for j in tokens if "{" in j or "}" in j or '"' in j]
+    assert not parasites, f"Tokens venus du JSON : {parasites[:10]}"
+
+    joints = "".join(tokens)
+    assert any(mot in joints for mot in ("Lyon", "confluent", "cœur", "histoire"))
+
+
+def test_le_plafond_doctets_porte_sur_le_texte_utile(tmp_path):
+    """`--octets-max` doit compter le texte extrait, pas les octets du fichier."""
+    import json as _json
+
+    from futo.tokenizer import _lire_textes
+
+    corpus = tmp_path / "c.jsonl"
+    corpus.write_text(
+        "\n".join(
+            _json.dumps({"text": "abcde", "titre": "un titre très long ignoré"})
+            for _ in range(100)
+        ),
+        encoding="utf-8",
+    )
+    lu = "".join(_lire_textes([corpus], octets_max=60))
+    # 6 octets utiles par ligne (« abcde » + saut) : on s'arrête vers 10 lignes,
+    # sans être trompé par la longueur du champ « titre ».
+    assert lu.count("abcde") <= 12
+    assert "titre" not in lu

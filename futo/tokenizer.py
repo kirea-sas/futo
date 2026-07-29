@@ -139,18 +139,58 @@ def _construire_vierge():
     return tok
 
 
+def _ouvrir(chemin: Path):
+    """Ouvre un fichier texte, compressé ou non."""
+    if chemin.suffix == ".gz":
+        import gzip
+
+        return gzip.open(chemin, "rt", encoding="utf-8", errors="replace")
+    return chemin.open("r", encoding="utf-8", errors="replace")
+
+
 def _lire_textes(chemins: Iterable[Path], octets_max: int | None = None) -> Iterator[str]:
     """Fournit les documents au trainer, sans tout charger en mémoire.
 
-    Les fichiers sont lus par blocs de lignes ; `octets_max` permet de plafonner
-    la quantité de texte utilisée (entraîner un BPE sur 2 Go suffit largement,
-    au-delà on paie du temps sans gagner de qualité).
+    Deux formats sont acceptés : du texte brut, et du JSONL — le format des
+    grands corpus, dont on extrait le champ de texte. Lire un JSONL ligne à
+    ligne ferait apprendre au tokenizer la syntaxe JSON elle-même.
+
+    `octets_max` plafonne la quantité de TEXTE UTILE lue, pas la taille du
+    fichier : entraîner un BPE sur 2 Go suffit largement, au-delà on paie du
+    temps sans gagner en qualité de vocabulaire.
     """
     lus = 0
     tampon: list[str] = []
     for chemin in chemins:
-        with Path(chemin).open("r", encoding="utf-8", errors="replace") as fh:
+        chemin = Path(chemin)
+        # Un corpus réel arrive en JSONL. Lire ses lignes telles quelles ferait
+        # apprendre au BPE la SYNTAXE JSON — des tokens comme `{"text": "` ou
+        # `", "titre": "` occuperaient le vocabulaire à la place du français, et
+        # ils reviendraient dans le texte généré. Défaut réel, attrapé au
+        # lancement sur les 7 Go de Wikipédia.
+        est_jsonl = chemin.name.endswith((".jsonl", ".jsonl.gz", ".json"))
+        with _ouvrir(chemin) as fh:
             for ligne in fh:
+                if est_jsonl:
+                    ligne = ligne.strip()
+                    if not ligne:
+                        continue
+                    try:
+                        objet = json.loads(ligne)
+                    except json.JSONDecodeError:
+                        continue  # ligne abîmée : on la saute, sans tout arrêter
+                    texte = next(
+                        (
+                            objet[cle]
+                            for cle in ("text", "texte", "content", "contenu")
+                            if isinstance(objet.get(cle), str)
+                        ),
+                        None,
+                    )
+                    if texte is None:
+                        continue
+                    ligne = texte + "\n"
+
                 tampon.append(ligne)
                 lus += len(ligne.encode("utf-8"))
                 if len(tampon) >= 10_000:
