@@ -84,6 +84,13 @@ la commande commence par estimer la durée **sur votre propre machine** :
 futo info configs/futo-small.yaml
 ```
 
+Et pour remplacer l'estimation par une **mesure**, sur votre machine, en une
+trentaine de secondes et sans corpus :
+
+```bash
+futo bench configs/futo-small.yaml
+```
+
 Sur un Mac Apple Silicon, le GPU intégré est détecté et utilisé sans réglage.
 Un Mac ne mènera pas le run complet de `futo-small` (plus d'un mois), mais il
 est le bon outil pour tout ce qui vient avant : entraîner le tokenizer,
@@ -233,11 +240,11 @@ futo/
   data.py        format de shards, préparation, chargeur déterministe
   train.py       boucle d'entraînement, plannings, checkpoints, MFU, journal
   eval.py        perplexité, bits par octet, sondes grammaticales
-  cli.py         la commande « futo »
+  cli.py         la commande « futo », dont « bench » (débit réel mesuré)
 configs/         les quatre tailles, plus les réglages communs
 data/echantillon/  142 Ko de français original, pour les tests hors ligne
 data/sondes/     les 72 paires minimales françaises
-tests/           188 tests, 17 s sur processeur, sans réseau
+tests/           190 tests, 17 s sur processeur, sans réseau
 docs/            architecture, données, carte du modèle, Mac
 ```
 
@@ -249,7 +256,7 @@ docs/            architecture, données, carte du modèle, Mac
 pytest
 ```
 
-188 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
+190 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
 ne vérifient pas des formes de tenseurs mais des propriétés qu'un modèle peut
 violer en silence :
 

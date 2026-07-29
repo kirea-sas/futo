@@ -43,6 +43,7 @@ __all__ = [
     "nom_du_materiel",
     "flops_crete_du_materiel",
     "contexte_autocast",
+    "mesurer_debit",
 ]
 
 
@@ -285,23 +286,50 @@ class Journal:
 
 
 def _etat_alea() -> dict:
-    """Photographie des trois générateurs aléatoires du processus."""
+    """Photographie des trois générateurs aléatoires du processus.
+
+    Les états sont explicitement ramenés sur le processeur : c'est là qu'ils
+    vivent, et c'est là qu'il faudra les rendre au retour (voir
+    `_octets_sur_processeur`).
+    """
     etat = {
-        "torch": torch.get_rng_state(),
+        "torch": torch.get_rng_state().cpu(),
         "numpy": np.random.get_state(),
         "python": random.getstate(),
     }
     if torch.cuda.is_available():
-        etat["cuda"] = torch.cuda.get_rng_state_all()
+        etat["cuda"] = [e.cpu() for e in torch.cuda.get_rng_state_all()]
     return etat
 
 
+def _octets_sur_processeur(tenseur: torch.Tensor) -> torch.Tensor:
+    """Ramène un état de générateur sur le processeur, en octets.
+
+    C'est le correctif d'un défaut que seule une vraie carte pouvait révéler.
+    Un checkpoint se recharge avec `map_location=<périphérique>`, et
+    `map_location` déplace **tous** les tenseurs du fichier — y compris l'état
+    du générateur aléatoire, qui n'a pourtant rien à faire sur un accélérateur.
+    `torch.set_rng_state` exige un ByteTensor du processeur et refuse le reste :
+
+        TypeError: RNG state must be a torch.ByteTensor
+
+    La reprise était donc cassée sur tout accélérateur — MPS comme CUDA — et
+    fonctionnait uniquement sur processeur, c'est-à-dire précisément là où la
+    suite de tests s'exécute. Signalé par un run sur Apple M2 Max.
+    """
+    if tenseur.device.type != "cpu":
+        tenseur = tenseur.cpu()
+    if tenseur.dtype != torch.uint8:
+        tenseur = tenseur.to(torch.uint8)
+    return tenseur
+
+
 def _restaurer_alea(etat: dict) -> None:
-    torch.set_rng_state(etat["torch"])
+    torch.set_rng_state(_octets_sur_processeur(etat["torch"]))
     np.random.set_state(etat["numpy"])
     random.setstate(etat["python"])
     if "cuda" in etat and torch.cuda.is_available():
-        torch.cuda.set_rng_state_all(etat["cuda"])
+        torch.cuda.set_rng_state_all([_octets_sur_processeur(e) for e in etat["cuda"]])
 
 
 def sauvegarder(
@@ -412,6 +440,132 @@ def evaluer(modele, chargeur: ChargeurTokens, n_lots: int, peripherique, context
         total += perte.item()
     modele.train(etait_en_entrainement)
     return total / max(n_lots, 1)
+
+
+# --------------------------------------------------------------------------- #
+# Mesure de débit
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class ResultatDebit:
+    """Ce que mesure `futo bench` : le seul chiffre qui permette de décider."""
+
+    tokens_par_s: float
+    mfu: float
+    secondes_par_pas: float
+    materiel: str
+    dtype: str
+    micro_lots: int
+    tokens_mesures: int
+
+    def duree_estimee(self, tokens_totaux: int) -> float:
+        """Secondes pour un entraînement complet, au débit mesuré."""
+        return tokens_totaux / max(self.tokens_par_s, 1e-9)
+
+
+def _synchroniser(peripherique: torch.device) -> None:
+    """Attend la fin des calculs en cours.
+
+    Indispensable pour chronométrer : sur GPU comme sur MPS, les opérations sont
+    lancées de façon asynchrone. Sans synchronisation, on mesurerait la vitesse
+    à laquelle Python empile des ordres, pas celle à laquelle la machine calcule.
+    """
+    if peripherique.type == "cuda":
+        torch.cuda.synchronize()
+    elif peripherique.type == "mps" and hasattr(torch, "mps"):
+        torch.mps.synchronize()
+
+
+def mesurer_debit(
+    cfg: FutoConfig,
+    micro_lots: int = 20,
+    echauffement: int = 3,
+    verbeux: bool = True,
+) -> ResultatDebit:
+    """Mesure le débit réel d'une configuration, sur des données synthétiques.
+
+    Aucun corpus, aucun tokenizer, aucun fichier : des tokens tirés au hasard
+    suffisent, puisque le coût de calcul d'un transformeur ne dépend pas du
+    contenu. On exécute de vraies passes avant et arrière, avec le vrai
+    optimiseur, dans la vraie précision — c'est bien le débit d'entraînement
+    qu'on mesure, pas une approximation.
+
+    À quoi ça sert : répondre à « combien de temps sur MA machine » en une
+    trentaine de secondes, avant d'engager des jours de calcul ou des euros de
+    location. Les estimations de `futo info` reposent sur des FLOPs crête
+    théoriques ; celle-ci repose sur une mesure.
+    """
+
+    def dire(message: str = "") -> None:
+        if verbeux:
+            print(message, flush=True)
+
+    peripherique = choisir_peripherique()
+    dtype = resoudre_dtype(cfg.train.dtype, peripherique, dire)
+    contexte = contexte_autocast(peripherique, dtype, dire)
+
+    torch.manual_seed(cfg.train.seed)
+    modele = Futo(cfg.model).to(peripherique)
+    if cfg.train.gradient_checkpointing:
+        modele.activer_gradient_checkpointing(True)
+    modele.train()
+
+    optimiseur = torch.optim.AdamW(
+        modele.groupes_parametres(cfg.train.weight_decay),
+        lr=cfg.train.lr,
+        betas=(cfg.train.beta1, cfg.train.beta2),
+        fused=peripherique.type == "cuda",
+    )
+
+    B, T = cfg.data.batch_size, cfg.model.block_size
+    tokens_par_micro_lot = B * T
+    # Un seul lot, réutilisé : on mesure le calcul, pas le chargement.
+    entree = torch.randint(0, cfg.model.vocab_size, (B, T), device=peripherique)
+    cible = torch.randint(0, cfg.model.vocab_size, (B, T), device=peripherique)
+
+    def un_micro_lot(indice: int) -> None:
+        with contexte:
+            _, perte = modele(entree, cibles=cible)
+            perte = perte / cfg.train.grad_accum
+        perte.backward()
+        if (indice + 1) % cfg.train.grad_accum == 0:
+            if cfg.train.grad_clip > 0:
+                torch.nn.utils.clip_grad_norm_(modele.parameters(), cfg.train.grad_clip)
+            optimiseur.step()
+            optimiseur.zero_grad(set_to_none=True)
+
+    # L'échauffement ne compte pas : première allocation, compilation des
+    # noyaux, montée en fréquence. Le mesurer fausserait tout vers le bas.
+    dire(f"  échauffement ({echauffement} micro-lots)…")
+    for i in range(echauffement):
+        un_micro_lot(i)
+    _synchroniser(peripherique)
+    optimiseur.zero_grad(set_to_none=True)
+
+    dire(f"  mesure ({micro_lots} micro-lots de {tokens_par_micro_lot} tokens)…")
+    depart = time.perf_counter()
+    for i in range(micro_lots):
+        un_micro_lot(i)
+    _synchroniser(peripherique)
+    ecoule = time.perf_counter() - depart
+
+    tokens_mesures = micro_lots * tokens_par_micro_lot
+    tokens_par_s = tokens_mesures / max(ecoule, 1e-9)
+
+    materiel = nom_du_materiel(peripherique)
+    crete = flops_crete_du_materiel(materiel)
+    mfu = cfg.model.flops_par_token() * tokens_par_s / crete if crete > 0 else 0.0
+
+    return ResultatDebit(
+        tokens_par_s=tokens_par_s,
+        mfu=mfu,
+        secondes_par_pas=cfg.tokens_par_pas() / max(tokens_par_s, 1e-9),
+        materiel=materiel,
+        dtype=str(dtype).replace("torch.", ""),
+        micro_lots=micro_lots,
+        tokens_mesures=tokens_mesures,
+    )
 
 
 # --------------------------------------------------------------------------- #

@@ -19,7 +19,15 @@ import torch
 from futo.config import FutoConfig, ModelConfig, TrainConfig
 from futo.data import ChargeurTokens
 from futo.model import Futo
-from futo.train import charger, entrainer, sauvegarder, taux_apprentissage
+from futo.train import (
+    _octets_sur_processeur,
+    charger,
+    choisir_peripherique,
+    entrainer,
+    mesurer_debit,
+    sauvegarder,
+    taux_apprentissage,
+)
 
 # --------------------------------------------------------------------------- #
 # Est-ce que ça apprend ?
@@ -177,6 +185,46 @@ def test_sauvegarde_est_atomique(tmp_path, config_modele):
     assert not list(tmp_path.glob("*.tmp"))
 
 
+def test_etat_alea_est_toujours_rendu_au_processeur():
+    """L'état du générateur doit revenir sur le processeur, en octets.
+
+    Défaut réel, trouvé par un run sur Apple M2 Max : un checkpoint se recharge
+    avec `map_location=<périphérique>`, ce qui déplace TOUS les tenseurs du
+    fichier — y compris l'état du générateur aléatoire. `torch.set_rng_state`
+    exige alors un ByteTensor du processeur et lève
+    « RNG state must be a torch.ByteTensor ». La reprise était donc cassée sur
+    MPS et sur CUDA, et fonctionnait uniquement sur processeur — c'est-à-dire
+    précisément là où la suite de tests s'exécute.
+
+    Ce test vérifie la normalisation, seule partie reproductible sans
+    accélérateur. Le cas complet ne peut être couvert que sur du vrai matériel :
+    c'est noté dans la dette technique du ROADMAP.
+    """
+    etat = torch.get_rng_state()
+    normalise = _octets_sur_processeur(etat)
+    assert normalise.device.type == "cpu"
+    assert normalise.dtype == torch.uint8
+    torch.set_rng_state(normalise)  # ne doit pas lever
+
+    # Un type autre que uint8 — ce que produirait une conversion malencontreuse —
+    # doit être ramené, pas propagé jusqu'à set_rng_state.
+    ramene = _octets_sur_processeur(etat.to(torch.int16))
+    assert ramene.dtype == torch.uint8
+
+
+def test_letat_alea_du_checkpoint_est_sur_le_processeur(tmp_path, config_modele):
+    """Et il doit déjà l'être dans le fichier, avant tout rechargement."""
+    modele = Futo(config_modele)
+    optimiseur = torch.optim.AdamW(modele.parameters(), lr=1e-3)
+    chemin = tmp_path / "c.pt"
+    sauvegarder(chemin, modele, optimiseur, FutoConfig(model=config_modele),
+                pas=1, meilleure_val=1.0)
+
+    charge = torch.load(chemin, map_location="cpu", weights_only=False)
+    assert charge["alea"]["torch"].device.type == "cpu"
+    assert charge["alea"]["torch"].dtype == torch.uint8
+
+
 def test_checkpoint_absent_leve_une_erreur_claire(tmp_path):
     with pytest.raises(FileNotFoundError, match="introuvable"):
         charger(tmp_path / "absent.pt")
@@ -200,11 +248,27 @@ def test_nettoyage_garde_les_plus_recents(config_entrainement):
 
 
 def test_meme_graine_meme_resultat(config_entrainement, tmp_path):
+    """Deux exécutions de même graine doivent donner le même résultat.
+
+    La tolérance dépend du matériel, et ce n'est pas une concession de confort.
+    Sur processeur, deux exécutions identiques donnent le même flottant au bit
+    près. Sur un accélérateur — MPS comme CUDA — l'ordre des réductions peut
+    varier d'une exécution à l'autre, et l'écart observé est celui de l'arrondi
+    du float32 : 4,8 × 10⁻⁷ mesuré sur Apple M2 Max, soit ~2 × 10⁻⁸ en relatif.
+    Exiger le bit près là-dessus reviendrait à tester le matériel, pas le code.
+    """
     a = _copier(config_entrainement, tmp_path / "a")
     b = _copier(config_entrainement, tmp_path / "b")
     r1 = entrainer(a, verbeux=False)
     r2 = entrainer(b, verbeux=False)
-    assert abs(r1.perte_finale - r2.perte_finale) < 1e-9
+
+    sur_processeur = choisir_peripherique().type == "cpu"
+    tolerance = 1e-9 if sur_processeur else 1e-5
+    ecart = abs(r1.perte_finale - r2.perte_finale)
+    assert ecart < tolerance, (
+        f"Deux exécutions de même graine diffèrent de {ecart:.2e} "
+        f"(tolérance {tolerance:.0e} sur {choisir_peripherique().type})."
+    )
 
 
 def test_graine_differente_resultat_different(config_entrainement, tmp_path):
@@ -251,6 +315,49 @@ def test_divergence_est_detectee(config_entrainement):
     config_entrainement.train.max_steps = 50
     with pytest.raises(RuntimeError, match="divergé"):
         entrainer(config_entrainement, verbeux=False)
+
+
+# --------------------------------------------------------------------------- #
+# Mesure de débit
+# --------------------------------------------------------------------------- #
+
+
+def test_mesure_de_debit_sans_corpus():
+    """`futo bench` doit fonctionner sans aucune donnée sur le disque.
+
+    C'est tout son intérêt : répondre à « combien de temps sur ma machine »
+    avant même d'avoir un corpus, donc avant d'engager des jours de calcul.
+    """
+    cfg = FutoConfig(
+        nom="bench",
+        model=ModelConfig(vocab_size=256, block_size=32, n_layer=2, n_head=2,
+                          n_kv_head=1, d_model=32),
+        train=TrainConfig(max_steps=100, warmup_steps=10, dtype="fp32", grad_accum=2),
+    )
+    r = mesurer_debit(cfg, micro_lots=4, echauffement=1, verbeux=False)
+
+    assert r.tokens_par_s > 0
+    assert r.tokens_mesures == 4 * cfg.data.batch_size * cfg.model.block_size
+    assert r.secondes_par_pas > 0
+    assert r.mfu >= 0.0
+    assert r.dtype == "float32"
+    assert r.materiel
+
+    # La durée extrapolée doit être cohérente avec le débit mesuré.
+    tokens = cfg.train.max_steps * cfg.tokens_par_pas()
+    assert r.duree_estimee(tokens) == pytest.approx(tokens / r.tokens_par_s)
+
+
+def test_la_mesure_de_debit_ne_touche_a_aucun_fichier(tmp_path, monkeypatch):
+    """Ni checkpoint, ni journal, ni shard : la mesure ne doit rien écrire."""
+    monkeypatch.chdir(tmp_path)
+    cfg = FutoConfig(
+        model=ModelConfig(vocab_size=128, block_size=16, n_layer=1, n_head=2,
+                          n_kv_head=1, d_model=32),
+        train=TrainConfig(max_steps=50, warmup_steps=5, dtype="fp32"),
+    )
+    mesurer_debit(cfg, micro_lots=2, echauffement=1, verbeux=False)
+    assert not list(tmp_path.iterdir()), "La mesure de débit a écrit sur le disque."
 
 
 # --------------------------------------------------------------------------- #

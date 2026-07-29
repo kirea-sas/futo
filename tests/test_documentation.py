@@ -15,9 +15,22 @@ from pathlib import Path
 import pytest
 
 RACINE = Path(__file__).resolve().parent.parent
+
+# Les dossiers à ne jamais parcourir. `.venv` compte : le README conseille de
+# créer l'environnement virtuel DANS le dépôt, et site-packages regorge de
+# fichiers Markdown de bibliothèques tierces. Sans cette exclusion, la suite
+# testait la documentation de PyTorch — 51 tests de plus, et le risque d'un
+# échec incompréhensible sur un README qui ne nous appartient pas.
+# Signalé par un run sur un Mac où le venv vivait dans le dépôt.
+DOSSIERS_IGNORES = {
+    ".git", ".venv", "venv", "env", "node_modules", "site-packages",
+    "build", "dist", ".tox", ".pytest_cache", ".ruff_cache", "__pycache__",
+}
 DOCUMENTS = sorted(
     p for p in RACINE.rglob("*.md")
-    if ".git" not in p.parts and "node_modules" not in p.parts
+    if not DOSSIERS_IGNORES & set(p.parts) and not any(
+        partie.endswith((".egg-info", ".dist-info")) for partie in p.parts
+    )
 )
 
 
@@ -38,6 +51,25 @@ def test_il_y_a_bien_des_documents():
     assert DOCUMENTS, "Aucun document Markdown trouvé."
     noms = {p.name for p in DOCUMENTS}
     assert {"README.md", "ROADMAP.md"} <= noms
+
+
+def test_aucun_document_etranger_nest_ramasse():
+    """La collecte ne doit ramasser QUE les documents du dépôt.
+
+    Un environnement virtuel créé dans le dépôt — ce que le README conseille —
+    apporte des dizaines de fichiers Markdown de bibliothèques tierces. Les
+    tester n'a aucun sens, gonfle le nombre de tests, et peut faire échouer la
+    suite sur un README qui ne nous appartient pas.
+    """
+    etrangers = [
+        str(d.relative_to(RACINE)) for d in DOCUMENTS
+        if DOSSIERS_IGNORES & set(d.parts)
+    ]
+    assert not etrangers, f"Documents hors du dépôt ramassés : {etrangers}"
+    # Le dépôt est petit : au-delà d'une vingtaine, c'est qu'on ratisse trop.
+    assert len(DOCUMENTS) < 20, (
+        f"{len(DOCUMENTS)} documents collectés — la collecte ratisse trop large."
+    )
 
 
 @pytest.mark.parametrize("document", DOCUMENTS, ids=lambda p: str(p.relative_to(RACINE)))

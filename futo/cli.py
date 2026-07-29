@@ -126,6 +126,42 @@ def cmd_info(args) -> int:
     return 0
 
 
+def cmd_bench(args) -> int:
+    """Mesure le débit réel de la configuration sur cette machine."""
+    from .config import charger_config
+    from .train import mesurer_debit
+
+    cfg = charger_config(args.config, args.set)
+    print(cfg.resume())
+    print()
+
+    resultat = mesurer_debit(
+        cfg, micro_lots=args.micro_lots, echauffement=args.echauffement,
+        verbeux=not args.silencieux,
+    )
+
+    print()
+    print(f"Mesuré sur {resultat.materiel} en {resultat.dtype} :")
+    print(f"  {_milliers(resultat.tokens_par_s)} tokens/s")
+    if resultat.mfu > 0:
+        print(f"  MFU {resultat.mfu * 100:.1f} % (rapporté à une crête estimée)")
+    print(f"  {resultat.secondes_par_pas:.2f} s par pas d'optimisation "
+          f"({_milliers(cfg.tokens_par_pas())} tokens)")
+    print()
+
+    tokens_totaux = cfg.train.max_steps * cfg.tokens_par_pas()
+    secondes = resultat.duree_estimee(tokens_totaux)
+    heures = secondes / 3600
+    duree = f"{heures:.1f} h" if heures < 72 else f"{heures / 24:.1f} jours"
+    print(f"Entraînement complet de « {cfg.nom} » à ce débit :")
+    print(f"  {cfg.train.max_steps} pas · {_milliers(tokens_totaux)} tokens · {duree}")
+    print()
+    print("  Ce chiffre-ci est MESURÉ, pas calculé : c'est celui sur lequel")
+    print("  décider. Il suppose un débit constant, ce qui est optimiste sur une")
+    print("  machine de bureau — veille, thermique, autres applications.")
+    return 0
+
+
 # --------------------------------------------------------------------------- #
 # tokenizer
 # --------------------------------------------------------------------------- #
@@ -421,6 +457,10 @@ Pour démarrer, dans l'ordre :
   futo train configs/futo-tiny.yaml
   futo generer sorties/tiny/dernier.pt --amorce "Il était une fois"
 
+Avant d'engager des jours de calcul, mesurez ce que vaut votre machine :
+
+  futo bench configs/futo-mac.yaml
+
 Chaque commande accepte --set pour surcharger la configuration :
 
   futo train configs/futo-small.yaml --set train.lr=3e-4 --set model.n_layer=8
@@ -441,6 +481,19 @@ Chaque commande accepte --set pour surcharger la configuration :
     p.add_argument("config", nargs="?", help="fichier YAML de configuration")
     ajouter_set(p)
     p.set_defaults(fonction=cmd_info)
+
+    # -- bench --
+    p = sous.add_parser(
+        "bench", help="mesure le débit réel de cette machine (sans corpus)"
+    )
+    p.add_argument("config", help="fichier YAML de configuration")
+    p.add_argument("--micro-lots", type=int, default=20,
+                   help="nombre de micro-lots chronométrés")
+    p.add_argument("--echauffement", type=int, default=3,
+                   help="micro-lots ignorés avant la mesure")
+    p.add_argument("--silencieux", action="store_true")
+    ajouter_set(p)
+    p.set_defaults(fonction=cmd_bench)
 
     # -- tokenizer --
     p_tok = sous.add_parser("tokenizer", help="entraîner et inspecter le tokenizer")

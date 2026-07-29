@@ -1,20 +1,60 @@
 # Travailler sur un Mac
 
-> **Rien de ce document n'a été mesuré sur un Mac.** Le dépôt a été écrit et
-> vérifié sur un processeur Linux sans GPU. Les durées ci-dessous sont
-> *calculées* à partir des FLOPs du modèle et d'ordres de grandeur de puissance
-> Apple Silicon, eux-mêmes approximatifs — Apple ne publie pas de chiffre de
-> FLOPs crête comparable à celui d'NVIDIA.
+> **Ce qui a été mesuré, et ce qui ne l'est pas.** Le dépôt a été écrit sur un
+> processeur Linux sans GPU. Un premier run sur **Apple M2 Max** a depuis fourni
+> de vraies mesures pour `futo-tiny` — reportées plus bas et signalées comme
+> telles. Les durées de `futo-mac` et `futo-small`, elles, restent **calculées**
+> à partir de FLOPs crête Apple approximatifs : Apple ne publie pas de chiffre
+> comparable à celui d'NVIDIA.
 >
-> Le premier vrai run donnera le débit réel en tokens/s affiché par la boucle.
-> C'est ce chiffre-là qu'il faudra reporter ici, en remplaçant les estimations.
+> Pour obtenir le vrai chiffre sur VOTRE machine sans engager des jours de
+> calcul, c'est `futo bench` — voir ci-dessous.
 
-Futo détecte le GPU intégré (MPS) tout seul, sans réglage :
+Futo détecte le GPU intégré (MPS) tout seul, sans réglage. Avant toute chose,
+mesurez :
 
 ```bash
-futo info configs/futo-mac.yaml     # affiche votre machine et une estimation
+futo bench configs/futo-mac.yaml
+```
+
+La commande tire des tokens au hasard — aucun corpus, aucun tokenizer — et
+exécute de vraies passes avant et arrière avec le vrai optimiseur, dans la vraie
+précision. En une trentaine de secondes, elle répond à la seule question qui
+compte avant de lancer un entraînement de plusieurs jours : combien de tokens
+par seconde, et donc combien de temps au total. Contrairement à `futo info`, qui
+extrapole depuis des FLOPs théoriques, ce chiffre est une mesure.
+
+```bash
+futo info configs/futo-mac.yaml    # estimation theorique
 futo train configs/futo-mac.yaml
 ```
+
+## Ce qui a été mesuré sur Apple M2 Max
+
+Premier run réel, `futo-tiny` (1,3 M de paramètres, contexte 256, lots de
+2 048 tokens), en **float32** — c'est ce que fixe la configuration `tiny` :
+
+| Mesure | Apple M2 Max (MPS) | 4 cœurs Linux, pour comparaison |
+|---|---|---|
+| Débit en régime | 57 000 à 60 000 tokens/s | 11 000 à 19 000 tokens/s |
+| 400 pas | 15,6 s | 45 à 77 s |
+| MFU affiché | 4,0 à 4,2 % | — |
+| Suite de tests | 14 s | 17 s |
+
+Soit un facteur **3 à 5** par rapport à quatre cœurs de processeur, sur un
+modèle qui est pourtant le pire cas possible pour un GPU.
+
+Deux précautions sur le MFU de 4 %, avant d'en tirer des conclusions :
+
+- **`futo-tiny` est pathologiquement petit.** Avec `d_model` à 128 et des lots de
+  2 048 tokens, le temps est dominé par le lancement des noyaux, pas par le
+  calcul. Un MFU faible est attendu et ne dit rien de `futo-mac`, dont les lots
+  sont soixante-quatre fois plus gros.
+- **Le run était en float32, le MFU est rapporté à une crête bf16.** À
+  précision égale, le chiffre serait à peu près doublé.
+
+Autrement dit : ces 4 % ne confirment ni n'infirment les 15 % supposés pour
+`futo-mac`. Seul un `futo bench configs/futo-mac.yaml` tranchera.
 
 ---
 
@@ -43,8 +83,8 @@ mélanges de corpus, deux tailles de vocabulaire, deux filtrages — et ces
 conclusions-là se transposent le plus souvent à `futo-small`. C'est le bon
 endroit pour se tromper, avant de payer un GPU.
 
-**Tout mettre au point.** `futo-tiny` tourne en moins d'une minute. Les 161
-tests passent en quelques secondes. Toute la mise au point du code se fait
+**Tout mettre au point.** `futo-tiny` tourne en 16 s sur un M2 Max. Les 190
+tests passent en 14 s. Toute la mise au point du code se fait
 localement, et seul le run final part sur une machine louée.
 
 ## Ce qu'un Mac ne fera pas
@@ -66,7 +106,10 @@ La division du travail qui a du sens :
 
 ## Les tailles et leurs durées calculées
 
-Durées à 15 % de MFU, valeur prudente pour MPS. À confirmer par la mesure.
+Durées à 15 % de MFU, valeur supposée pour MPS et **non vérifiée** : la seule
+mesure dont on dispose porte sur `futo-tiny`, qui n'est pas représentatif.
+Lancez `futo bench` sur la configuration qui vous intéresse plutôt que de vous
+fier à ce tableau.
 
 | Configuration | Paramètres | Calcul | M2 Max | M3 Max | M3 Ultra |
 |---|---|---|---|---|---|
@@ -96,9 +139,18 @@ désactivé, où il se traverse sans rien faire.
 
 **Le MFU affiché est indicatif.** Il est calculé à partir d'un chiffre de FLOPs
 crête estimé, listé dans `FLOPS_CRETE` au début de
-[`futo/train.py`](../futo/train.py). Le débit en **tokens/s**, lui, est une
-vraie mesure : c'est celui-là qu'il faut regarder et comparer d'un run à
-l'autre.
+[`futo/train.py`](../futo/train.py), et ce chiffre est une crête **bf16** : un
+run en float32 affichera donc un MFU environ deux fois trop bas. Le débit en
+**tokens/s**, lui, est une vraie mesure — c'est celui-là qu'il faut regarder et
+comparer d'un run à l'autre.
+
+**La reprise après plantage était cassée sur MPS.** Un checkpoint se recharge
+avec `map_location=<périphérique>`, ce qui déplaçait aussi l'état du générateur
+aléatoire vers le GPU, là où `torch.set_rng_state` exige un tenseur du
+processeur. Le défaut touchait MPS **et** CUDA, et passait inaperçu parce que la
+suite de tests s'exécute sur processeur. Corrigé, et signalé par un run sur
+M2 Max — c'est exactement le genre de faute qu'aucune intégration continue sans
+accélérateur ne peut attraper.
 
 **Mémoire unifiée.** Si l'entraînement sature la mémoire, PyTorch expose un
 plafond réglable :

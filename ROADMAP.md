@@ -17,7 +17,7 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 - [x] Prise en charge du Mac (MPS) : détection de la puce, précision mixte
       essayée puis repli annoncé, configuration `futo-mac` — voir docs/MAC.md
 - [x] Corpus d'exemple original de 142 Ko, licence propre, pour les tests hors ligne
-- [x] 188 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
+- [x] 190 tests, 18 s sur processeur, sans réseau — CI GitHub Actions,
       et le démarrage du README rejoué depuis un clone neuf dans un
       environnement virtuel vierge, jusqu'à la génération de texte,
       dont des tests de la DOCUMENTATION : les blocs de commandes doivent
@@ -78,10 +78,20 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
       cela reste à automatiser une fois les sources arrêtées
 - [ ] Aucune mesure de MFU réelle sur GPU — les durées annoncées sont calculées,
       pas mesurées. À corriger au premier entraînement
-- [ ] Le chemin Mac (MPS) n'a jamais été exécuté : le dépôt a été écrit sur un
-      processeur Linux sans GPU. Les FLOPs crête Apple sont des ordres de
-      grandeur, et les durées de docs/MAC.md des estimations. Le premier run sur
-      Mac doit donner le vrai débit en tokens/s et remplacer ces chiffres
+- [x] ~~Le chemin Mac (MPS) n'a jamais été exécuté~~ — fait le 29/07 sur
+      **Apple M2 Max**. Trois défauts trouvés, tous invisibles depuis une
+      intégration continue sur processeur : (1) la reprise après plantage était
+      cassée sur TOUT accélérateur, map_location déplaçant l'état du générateur
+      aléatoire hors du processeur ; (2) le test de déterminisme exigeait le bit
+      près, impossible sur MPS où l'ordre des réductions varie ; (3) les tests de
+      documentation ratissaient les fichiers Markdown de .venv (239 tests au lieu
+      de 188)
+- [ ] Le débit de `futo-mac` sur Mac reste NON MESURÉ. Les 4 % de MFU relevés
+      sur `futo-tiny` ne sont pas représentatifs : modèle minuscule, lots 64 fois
+      plus petits, et fp32 comparé à une crête bf16. Lancer
+      `futo bench configs/futo-mac.yaml` et remplacer les estimations
+- [ ] Le MFU est rapporté à une crête bf16 quelle que soit la précision réelle :
+      un run fp32 affiche donc un MFU environ deux fois trop bas
 
 ## 📏 Chiffres mesurés à ce jour
 
@@ -92,7 +102,11 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 | Fertilité du tokenizer | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
 | Mots rendus en un seul token | 62,6 % | idem |
 | Aller-retour tokenizer | exact | accents, ligatures, guillemets, émojis, code |
-| Suite de tests | 188 tests, 17 s | 4 cœurs, hors ligne |
+| Suite de tests | 190 tests, 18 s | 4 cœurs, hors ligne |
+| Suite de tests | 190 tests, 14 s | Apple M2 Max |
+| Débit `futo-tiny` | 57 000-60 000 tokens/s | **Apple M2 Max**, MPS, fp32 |
+| Entraînement `futo-tiny` | 400 pas en 15,6 s | **Apple M2 Max**, MPS, fp32 |
+| MFU `futo-tiny` | 4,0-4,2 % | M2 Max, fp32 contre crête bf16 — non représentatif |
 | Entraînement `futo-tiny` | 400 pas, 45-77 s, perte 8,3 → 4,17 | 4 cœurs, fp32 (deux mesures) |
 | Débit `futo-tiny` | 11 000-19 000 tokens/s | 4 cœurs, fp32 |
 
