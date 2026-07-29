@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "futo"
+version = "0.1.0"
+description = "Futo — un modèle de langue français entraîné de zéro"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Kirea SAS", email = "contact@kirea.fr" }]
+keywords = ["français", "modèle de langue", "transformer", "llm", "tokenizer"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: French",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Le strict nécessaire. Tout ce qui n'est pas indispensable à l'entraînement
+# est relégué dans un extra : on doit pouvoir installer Futo sur une machine
+# de location sans traîner un écosystème entier.
+dependencies = [
+    "torch>=2.4",
+    "numpy>=1.24",
+    "tokenizers>=0.15",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.6"]
+# Pour récupérer et convertir de vrais corpus (voir « futo data telecharger »).
+donnees = ["datasets>=2.18", "huggingface-hub>=0.23", "zstandard>=0.22"]
+# Export des poids vers d'autres écosystèmes. Isolé exprès : le cœur de Futo
+# ne dépend jamais de transformers.
+hf = ["safetensors>=0.4", "transformers>=4.40"]
+
+[project.scripts]
+futo = "futo.cli:main"
+
+[project.urls]
+Source = "https://github.com/kirea-sas/futo"
+
+[tool.setuptools.packages.find]
+include = ["futo*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -q pour un affichage compact, --strict-markers pour qu'un marqueur mal
+# orthographié soit une erreur plutôt qu'un test silencieusement ignoré.
+addopts = "-q --strict-markers"
+markers = ["lent: test dépassant quelques secondes"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+# E501 : la longueur des lignes est déjà gérée par le formateur, et certaines
+# lignes de documentation française dépassent naturellement.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]

@@ -1,0 +1,31 @@
+# futo-tiny — la configuration des tests et du premier essai.
+#
+# Elle n'a aucune valeur linguistique : elle sert à vérifier que la chaîne
+# complète fonctionne (tokenizer, shards, entraînement, génération) sur un
+# processeur, en quelques minutes, sans rien télécharger. C'est la configuration
+# à lancer en premier quand on découvre le dépôt.
+hérite: commun.yaml
+nom: futo-tiny
+
+model:
+  vocab_size: 4096
+  block_size: 256
+  n_layer: 4
+  n_head: 4
+  n_kv_head: 2
+  d_model: 128
+  dropout: 0.0
+
+data:
+  batch_size: 8
+
+train:
+  max_steps: 200
+  grad_accum: 1
+  lr: 1.0e-3
+  warmup_steps: 20
+  dtype: fp32          # sur processeur, bf16 n'apporte rien
+  eval_every: 50
+  eval_batches: 10
+  save_every: 100
+  dossier_sortie: sorties/tiny

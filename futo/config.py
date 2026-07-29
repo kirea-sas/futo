@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import types
 import typing
 from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
@@ -281,9 +282,14 @@ class FutoConfig:
 
 
 def _est_optionnel(annotation: Any) -> tuple[bool, Any]:
-    """Déplie `X | None` et renvoie (est_optionnel, X)."""
+    """Déplie `X | None` et renvoie (est_optionnel, X).
+
+    Deux écritures coexistent : `Optional[X]`, dont l'origine est
+    `typing.Union`, et `X | None` (Python 3.10+), dont l'origine est
+    `types.UnionType`. Il faut reconnaître les deux.
+    """
     origine = typing.get_origin(annotation)
-    if origine is typing.Union or str(origine) == "types.UnionType":
+    if origine is typing.Union or origine is types.UnionType:
         args = [a for a in typing.get_args(annotation) if a is not type(None)]
         if len(args) == 1:
             return True, args[0]

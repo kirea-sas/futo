@@ -352,6 +352,7 @@ class Futo(nn.Module):
         cibles: torch.Tensor | None = None,
         cache: CacheKV | None = None,
         indice_ignore: int = -100,
+        tous_les_pas: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         """Calcule les logits, et la perte si `cibles` est fourni.
 
@@ -359,6 +360,11 @@ class Futo(nn.Module):
         valant `indice_ignore` ne comptent pas dans la perte : c'est ainsi qu'on
         neutralise le rembourrage et, si on le souhaite, le premier token de
         chaque document.
+
+        Sans `cibles`, seul le dernier pas est projeté sur le vocabulaire : c'est
+        tout ce dont la génération a besoin, et cela évite une multiplication
+        (T−1)×V inutile. `tous_les_pas=True` force le calcul complet, nécessaire
+        pour noter une séquence entière sans fournir de cibles.
         """
         B, T = entree.shape
         decalage = cache.longueur if cache is not None else 0
@@ -382,9 +388,7 @@ class Futo(nn.Module):
         x = self.norme_finale(x)
 
         if cibles is None:
-            # En génération, seul le dernier pas sert : on économise une
-            # multiplication (T-1)·V inutile — significatif quand V = 32 768.
-            logits = self.tete(x[:, -1:, :])
+            logits = self.tete(x if tous_les_pas else x[:, -1:, :])
             return logits, None
 
         logits = self.tete(x)

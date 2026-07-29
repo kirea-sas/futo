@@ -1,0 +1,30 @@
+# Réglages partagés par toutes les tailles de modèle.
+# Les fichiers futo-*.yaml en héritent via la clé « hérite ».
+
+data:
+  dossier: data/prepare
+  prefixe_train: train
+  prefixe_val: val
+  tokenizer: data/tokenizer/futo-tokenizer.json
+  seed: 1234
+
+train:
+  # AdamW. beta2 à 0,95 plutôt que 0,999 : sur un pré-entraînement, une moyenne
+  # du second moment plus courte réagit mieux aux changements de régime et
+  # réduit les pics de perte.
+  beta1: 0.9
+  beta2: 0.95
+  eps: 1.0e-8
+  weight_decay: 0.1
+  grad_clip: 1.0
+  schedule: cosine
+  lr_min_ratio: 0.1
+  dtype: bf16
+  compile: false
+  seed: 1337
+  log_every: 10
+  garder_n_checkpoints: 3
+
+eval:
+  batches: 100
+  sondes: data/sondes/paires-minimales-fr.jsonl

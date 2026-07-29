@@ -1,0 +1,35 @@
+# futo-base — 299 M de paramètres, contexte doublé.
+#
+# Budget visé : 30 milliards de tokens (~100 tokens par paramètre).
+# Coût de calcul, d'après « futo info configs/futo-base.yaml » : 72 EFLOP.
+# À 40 % de MFU, environ 50 h sur un H100 (6,7 jours sur un A100) ; à 30 %,
+# environ 67 h. Comptez 150 à 250 € de location. Sur 8 H100, le temps d'horloge
+# tombe à 6-8 h pour le même coût total.
+#
+# Estimations calculées, à confirmer par la mesure.
+hérite: commun.yaml
+nom: futo-base
+
+model:
+  vocab_size: 32768
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_kv_head: 4
+  d_model: 1024
+  dropout: 0.0
+
+data:
+  batch_size: 8
+
+train:
+  # 8 × 2048 × 64 = 1 048 576 tokens par pas ; 28 600 pas ≈ 30,0 G tokens.
+  max_steps: 28600
+  grad_accum: 64
+  lr: 4.0e-4
+  warmup_steps: 1000
+  eval_every: 500
+  eval_batches: 50
+  save_every: 1000
+  gradient_checkpointing: false
+  dossier_sortie: sorties/base

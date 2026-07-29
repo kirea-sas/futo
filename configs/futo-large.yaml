@@ -1,0 +1,45 @@
+# futo-large — 1,18 milliard de paramètres. L'objectif à un an, pas à un mois.
+#
+# Budget visé : 100 milliards de tokens. Cela suppose d'avoir rassemblé et
+# nettoyé ce volume de français de qualité, ce qui est le vrai obstacle : c'est
+# le travail sur les données, pas le calcul, qui décidera de la réussite.
+#
+# Coût de calcul, d'après « futo info configs/futo-large.yaml » : 829 EFLOP.
+# Sur un seul H100 à 40 % de MFU, 24 jours — à éviter, le risque de perdre le
+# run est trop élevé. Sur 8 H100, environ 3 jours d'horloge, pour 1 500 à
+# 2 500 € de location selon le MFU obtenu et le tarif négocié.
+#
+# À cette échelle, le calcul n'est plus le principal risque : rassembler et
+# nettoyer 100 milliards de tokens de français de qualité l'est.
+#
+# À cette taille, activez gradient_checkpointing si la mémoire manque, et
+# préférez le planning WSD : il permet d'allonger l'entraînement en cours de
+# route, ce que le cosinus interdit.
+hérite: commun.yaml
+nom: futo-large
+
+model:
+  vocab_size: 32768
+  block_size: 2048
+  n_layer: 24
+  n_head: 16
+  n_kv_head: 8
+  d_model: 2048
+  dropout: 0.0
+
+data:
+  batch_size: 8
+
+train:
+  # 8 × 2048 × 128 = 2 097 152 tokens par pas ; 47 700 pas ≈ 100,0 G tokens.
+  max_steps: 47700
+  grad_accum: 128
+  lr: 3.0e-4
+  warmup_steps: 2000
+  schedule: wsd
+  decay_steps: 8000
+  eval_every: 500
+  eval_batches: 50
+  save_every: 500
+  gradient_checkpointing: true
+  dossier_sortie: sorties/large

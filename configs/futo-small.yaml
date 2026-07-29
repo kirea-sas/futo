@@ -1,0 +1,41 @@
+# futo-small — le premier modèle réellement utile. 101 M de paramètres.
+#
+# Budget visé : 10 milliards de tokens, soit environ 100 tokens par paramètre.
+# C'est cinq fois plus que le ratio de Chinchilla (20), et c'est volontaire :
+# Chinchilla minimise le coût d'ENTRAÎNEMENT à qualité donnée, alors qu'on veut
+# ici minimiser le coût d'INFÉRENCE — un modèle plus petit et plus longuement
+# entraîné coûte moins cher à faire tourner ensuite.
+#
+# Coût de calcul, tel que le donne « futo info configs/futo-small.yaml » :
+# 7,1 EFLOP. À 40 % de MFU, environ 5 h sur un H100 ou 16 h sur un A100 ; à
+# 30 %, comptez plutôt 7 h et 21 h. Aux tarifs de location courants (2 à
+# 3,50 €/h pour un H100, 1,50 à 2 €/h pour un A100), cela place le modèle
+# entre 20 et 40 €. C'est la configuration à faire tourner en premier.
+#
+# Ces chiffres sont des ESTIMATIONS calculées, pas des mesures : le premier vrai
+# entraînement doit les confirmer. Notez le MFU réel affiché par la boucle.
+hérite: commun.yaml
+nom: futo-small
+
+model:
+  vocab_size: 32768
+  block_size: 1024
+  n_layer: 12
+  n_head: 12
+  n_kv_head: 4
+  d_model: 768
+  dropout: 0.0
+
+data:
+  batch_size: 16
+
+train:
+  # 16 × 1024 × 32 = 524 288 tokens par pas ; 19 000 pas ≈ 10,0 G tokens.
+  max_steps: 19000
+  grad_accum: 32
+  lr: 6.0e-4
+  warmup_steps: 500
+  eval_every: 500
+  eval_batches: 50
+  save_every: 1000
+  dossier_sortie: sorties/small

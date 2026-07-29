@@ -2,26 +2,24 @@
 
 Vireloq 3.2 — Notes d'installation
 
-Avant d'installer Vireloq sur votre poste, vérifiez que l'environnement satisfait aux prérequis décrits ci-dessous. Le paquet a été compilé pour les distributions dérivées de Debian et pour macOS ; les utilisateurs de Windows passeront par la couche de compatibilité fournie séparément. Il faut qu'on insiste sur un point : l'installateur ne modifie jamais le fichier de configuration existant, il en dépose une copie suffixée à côté, et c'est à vous de fusionner les deux à la main.
+Avant d'installer Vireloq sur votre poste, vérifiez que l’environnement satisfait aux prérequis décrits ci-dessous. Le paquet a été compilé pour les distributions dérivées de Debian et pour macOS ; les utilisateurs de Windows passeront par la couche de compatibilité fournie séparément. Il faut qu'on insiste sur un point : l’installateur ne modifie jamais le fichier de configuration existant, il en dépose une copie suffixée à côté, et c’est à vous de fusionner les deux à la main.
 
-La première chose à faire, c'est de créer un environnement virtuel dédié. On évite ainsi que les dépendances de Vireloq n'entrent en conflit avec celles d'un autre projet installé sur la même machine. Ouvrez un terminal et tapez :
+La 1re chose à faire, c'est de créer un environnement virtuel dédié. On évite ainsi que les dépendances de Vireloq n'entrent en conflit avec celles d’un autre projet installé sur la même machine. Ouvrez un terminal et tapez :
 
     python3 -m venv ~/.local/venvs/vireloq
     source ~/.local/venvs/vireloq/bin/activate
     pip install --upgrade pip setuptools wheel
     pip install vireloq==3.2.1
 
-Si la commande échoue avec un message évoquant une roue non compatible, c'est presque toujours que la version de Python est trop ancienne. Vireloq 3.2 exige Python 3.11 au minimum ; la version 3.13 est recommandée. Pour vérifier, faites `python3 --version` et comparez. Est-ce que vous voyez bien un numéro supérieur ou égal à 3.11 ? Si ce n'est pas le cas, installez une version plus récente avant d'aller plus loin.
+Si la commande échoue avec un message évoquant une roue non compatible, c'est presque toujours que la version de Python est trop ancienne. Vireloq 3.2 exige Python 3.11 au minimum ; la version 3.13 est recommandée. Pour vérifier, faites `python3 --version` et comparez. Est-ce que vous voyez bien un numéro supérieur ou égal à 3.11 ? Si ce n'est pas le cas, installez une version plus récente avant d'aller plus loin.
 
-L'étape suivante consiste à générer le squelette de configuration. Le binaire s'en charge tout seul :
+L'étape suivante consiste à générer le squelette de configuration. Le binaire s'en charge tout seul :
 
     vireloq init --profil standard --dossier ~/Documents/vireloq
     cd ~/Documents/vireloq
     ls -la
 
-Vous devriez voir apparaître trois fichiers : `vireloq.yaml`, `sources.json` et un dossier `sorties/` encore vide. Le premier contient les réglages généraux, le deuxième la liste des sources de données, le troisième accueillera les fichiers produits. Ne renommez pas le dossier `sorties/` : plusieurs scripts internes le cherchent à cet emplacement exact, et l'erreur qui en découle n'est franchement pas parlante.
-
-Voici à quoi ressemble un fichier `vireloq.yaml` minimal, tel qu'il est écrit par la commande d'initialisation :
+Voici à quoi ressemble un fichier `vireloq.yaml` minimal, tel qu'il est écrit par la commande d'initialisation :
 
     version: 3
     projet:
@@ -41,9 +39,17 @@ Voici à quoi ressemble un fichier `vireloq.yaml` minimal, tel qu'il est écrit 
       niveau: info
       fichier: ./sorties/vireloq.log
 
-Les clés sont en français par convention interne à l'entreprise Ombrelune SAS, mais rien ne vous empêche d'écrire les vôtres en anglais : l'analyseur accepte les deux jeux de noms, et il les normalise au chargement. En revanche, l'indentation doit être faite avec des espaces, jamais avec des tabulations ; c'est une contrainte du format YAML lui-même, pas un caprice de Vireloq.
+Les clés sont en français par convention interne à l’entreprise Ombrelune SAS, mais rien ne vous empêche d’écrire les vôtres en anglais : l’analyseur accepte les deux jeux de noms, et il les normalise au chargement. En revanche, l’indentation doit être faite avec des espaces, jamais avec des tabulations ; c’est une contrainte du format YAML lui-même, pas un caprice de Vireloq.
 
-Le fichier `sources.json`, lui, décrit d'où proviennent les données. Il s'agit d'un tableau d'objets, chacun devant comporter au minimum une clé `id` et une clé `url` :
+Une remarque sur le traitement du texte, puisque Vireloq manipule beaucoup de chaînes françaises. La commande `vireloq normaliser` applique, si on le lui demande, une série de règles typographiques. Elle rétablit les majuscules accentuées que certains claviers escamotent — À, É, È, Ê, Ç, Ô, Û, Ï — parce qu'une base où l'on trouve à la fois « ETUDE » et « ÉTUDE » se dédoublonne très mal. Elle uniformise aussi les ligatures : œ dans cœur, œuf, œuvre, sœur, æ dans nævus ou dans la locution ex æquo. Enfin, elle sait convertir l'apostrophe droite ' en apostrophe typographique ’, ou l'inverse, selon l'option retenue.
+
+    vireloq normaliser --entree brut.csv --sortie propre.csv \
+        --majuscules-accentuees --ligatures --apostrophe typographique \
+        --espaces-insecables --nombres fr
+
+L'option `--espaces-insecables` insère une espace insécable devant les signes doubles — le point-virgule, les deux-points, le point d'exclamation, le point d'interrogation — et à l'intérieur des guillemets français. L'option `--nombres fr` réécrit les quantités au format local : le séparateur de milliers devient une espace insécable et la virgule sert de séparateur décimal, si bien que 1234.56 ressort en 1 234,56. Attention, cette dernière option ne s'applique jamais aux colonnes déclarées comme identifiants dans le sous-titre du schéma ; un code postal n'est pas un nombre, et le transformer en 75 001 casserait toutes les jointures.
+
+Le fichier `sources.json`, lui, décrit d'où proviennent les données. Il s'agit d'un tableau d'objets, chacun devant comporter au minimum une clé `id` et une clé `url` :
 
     [
       {
@@ -61,19 +67,17 @@ Le fichier `sources.json`, lui, décrit d'où proviennent les données. Il s'agi
       }
     ]
 
-Remarquez que l'URL peut être locale : le schéma `file://` est accepté au même titre que `https://`. Les sources marquées `"actif": false` sont conservées dans le fichier mais ignorées à l'exécution ; c'est pratique quand on veut désactiver temporairement un flux sans perdre son paramétrage.
-
 Guide de démarrage rapide
 
-Une fois l'installation terminée, on peut lancer un premier traitement. La commande de base est `vireloq lancer`, à laquelle on passe le nom d'un profil. Voici l'enchaînement typique d'une première session :
+Une fois l'installation terminée, on peut lancer un premier traitement. La commande de base est `vireloq lancer`, à laquelle on passe le nom d'un profil. Voici l'enchaînement typique d'une première session :
 
     vireloq verifier --strict
     vireloq lancer --profil standard --limite 5000
     vireloq rapport --format html --sortie ./sorties/rapport.html
 
-La commande `verifier` ne produit rien : elle relit la configuration, contacte chaque source active et signale les problèmes qu'elle rencontre. L'option `--strict` transforme les avertissements en erreurs, ce qui est très utile dans une chaîne d'intégration continue. La commande `lancer` fait le vrai travail ; l'option `--limite` restreint le nombre de lignes traitées, ce qu'on apprécie beaucoup quand on met au point une transformation sur un gros jeu de données.
+La commande `verifier` ne produit rien : elle relit la configuration, contacte chaque source active et signale les problèmes qu'elle rencontre. L'option `--strict` transforme les avertissements en erreurs, ce qui est très utile dans une chaîne d'intégration continue. La commande `lancer` fait le vrai travail ; l'option `--limite` restreint le nombre de lignes traitées, ce qu'on apprécie beaucoup quand on met au point une transformation sur un gros jeu de données.
 
-Pour intégrer Vireloq dans vos propres scripts, il existe une interface Python. Elle est délibérément petite : trois classes et une poignée de fonctions. Voici un exemple complet, qui charge une source, filtre les enregistrements et écrit le résultat :
+Pour intégrer Vireloq dans vos propres scripts, il existe une interface Python. Elle est délibérément petite : trois classes et une poignée de fonctions. Voici un exemple complet, qui charge une source, filtre les enregistrements et écrit le résultat :
 
     from vireloq import Projet, Filtre
 
@@ -91,9 +95,7 @@ Pour intégrer Vireloq dans vos propres scripts, il existe une interface Python.
     resultat.ecrire("./sorties/recensement_propre.parquet")
     print(f"{len(resultat)} lignes conservées sur {len(source)}")
 
-Notez l'annotation de type sur le paramètre `ligne` : elle n'est pas obligatoire, mais l'outil de vérification interne s'en sert pour détecter les incohérences avant l'exécution. Notez aussi que `filtrer` renvoie un nouvel objet plutôt que de modifier celui d'origine ; toutes les opérations de Vireloq suivent ce principe, ce qui permet de les enchaîner sans crainte.
-
-Côté navigateur, un petit client JavaScript permet d'interroger le serveur d'aperçu. Il ne dépend d'aucune bibliothèque externe et tient en quelques lignes :
+Côté navigateur, un petit client JavaScript permet d’interroger le serveur d'aperçu. Il ne dépend d'aucune bibliothèque externe et tient en quelques lignes :
 
     async function chargerApercu(identifiant, limite = 50) {
       const url = `http://localhost:8973/api/v1/apercu/${identifiant}?limite=${limite}`;
@@ -111,13 +113,11 @@ Côté navigateur, un petit client JavaScript permet d'interroger le serveur d'a
       .then((lignes) => console.table(lignes.slice(0, 10)))
       .catch((err) => console.error("Échec du chargement", err));
 
-Le serveur d'aperçu n'écoute que sur l'interface locale, et il n'y a pas d'authentification : ne l'exposez jamais sur un réseau partagé. Si vous avez besoin d'un accès distant, passez par un tunnel chiffré, par exemple avec `ssh -L 8973:localhost:8973 utilisateur@serveur.example`.
-
 Le format .glose expliqué
 
 Vireloq écrit ses annotations dans un format maison portant l'extension `.glose`. Ce format a été conçu pour être lisible par un humain, modifiable dans n'importe quel éditeur de texte, et suffisamment strict pour qu'une machine puisse l'analyser sans ambiguïté. Il ressemble de loin à du YAML, mais il en diffère sur plusieurs points importants.
 
-Un fichier `.glose` est une suite de blocs. Chaque bloc commence par une ligne d'en-tête introduite par un dièse suivi d'un espace, puis d'un identifiant. Viennent ensuite des lignes de propriété, de la forme `clé = valeur`, et éventuellement un corps de texte libre introduit par une ligne contenant uniquement trois tirets bas. Voici un bloc complet :
+Un fichier `.glose` est une suite de blocs. Chaque bloc commence par une ligne d'en-tête introduite par un dièse suivi d'un espace, puis d'un identifiant. Viennent ensuite des lignes de propriété, de la forme `clé = valeur`, et éventuellement un corps de texte libre introduit par une ligne contenant uniquement trois tirets bas. Voici un bloc complet :
 
     # bloc-0017
     type = commentaire
@@ -130,19 +130,15 @@ Un fichier `.glose` est une suite de blocs. Chaque bloc commence par une ligne d
     il suffirait de la sortir de la boucle pour gagner à peu près
     40 % de temps d'exécution sur les gros fichiers.
 
-Les valeurs ne sont jamais entre guillemets : tout ce qui suit le signe égal, espaces de tête retirés, constitue la valeur. C'est un choix délibéré, qui évite les échappements pénibles mais interdit les valeurs multilignes en dehors du corps. Les dates suivent la norme ISO 8601 avec décalage horaire explicite ; l'analyseur refuse les dates naïves, celles qui n'indiquent pas de fuseau.
-
-Un point qui surprend souvent : l'ordre des propriétés est significatif. Deux fichiers contenant les mêmes propriétés dans un ordre différent ne sont pas considérés comme identiques par l'outil de comparaison `vireloq diff`. Cela peut paraître pénible, mais c'est ce qui permet à l'outil de produire des différences minuscules quand on modifie un seul champ, plutôt que de réécrire le bloc entier.
-
-Pour convertir un fichier `.glose` en JSON, utilisez :
+Pour convertir un fichier `.glose` en JSON, utilisez :
 
     vireloq convertir --entree annotations.glose --sortie annotations.json --format json
 
-Et dans l'autre sens, avec l'option `--vers-glose`. La conversion est réversible à condition de ne pas avoir de clés dupliquées dans le JSON de départ, puisque le format `.glose` les autoriserait alors que JSON les écraserait silencieusement. C'est le genre de subtilité qui coûte cher quand on s'en aperçoit trop tard.
+La conversion est réversible à condition qu’aucune clé ne soit dupliquée dans le JSON de départ : le format `.glose` les accepterait toutes, là où JSON écraserait silencieusement les précédentes. C’est le genre de subtilité qui coûte cher quand on s'en aperçoit trop tard.
 
-Un message d'erreur commenté
+Un message d’erreur commenté
 
-Voici l'erreur la plus fréquemment signalée sur le forum d'entraide. Elle apparaît généralement au deuxième ou au troisième lancement, jamais au premier, ce qui la rend d'autant plus déroutante :
+Voici l’erreur la plus fréquemment signalée sur le forum d’entraide. Elle apparaît généralement au deuxième ou au troisième lancement, jamais au premier, ce qui la rend d’autant plus déroutante :
 
     Traceback (most recent call last):
       File "/usr/lib/vireloq/moteur/ordonnanceur.py", line 214, in resoudre
@@ -152,42 +148,34 @@ Voici l'erreur la plus fréquemment signalée sur le forum d'entraide. Elle appa
     vireloq.erreurs.CacheDesynchronise: le cache de ~/.cache/vireloq
     a été écrit par la version 3.1.4 mais la version courante est 3.2.1
 
-Décortiquons. La dernière ligne dit l'essentiel : le dossier de cache contient des données produites par une version antérieure du logiciel, et le format interne a changé entre-temps. Vireloq refuse de lire un cache qu'il ne comprend pas plutôt que de risquer de produire des résultats faux — ce qui, avouons-le, vaut mieux. L'avant-dernière ligne indique où l'exception a été levée, et la ligne du dessus donne le chemin complet du fichier fautif, `/usr/lib/vireloq/moteur/cache.py`, à la ligne 88.
+Décortiquons. La dernière ligne dit l'essentiel : le dossier de cache contient des données produites par une version antérieure du logiciel, et le format interne a changé entre-temps. Vireloq refuse de lire un cache qu'il ne comprend pas plutôt que de risquer de produire des résultats faux — ce qui, avouons-le, vaut mieux. L'avant-dernière ligne indique où l'exception a été levée, et la ligne du dessus donne le chemin complet du fichier fautif, `/usr/lib/vireloq/moteur/cache.py`, à la ligne 88.
 
-La correction est immédiate. Il suffit de vider le cache :
+La correction est immédiate. Il suffit de vider le cache :
 
     rm -rf ~/.cache/vireloq
     vireloq lancer --profil standard
 
-Le premier lancement suivant sera plus lent, forcément, puisque tout doit être recalculé. Sur un jeu de 1 234 567 enregistrements, comptez environ 2 h 30 sur une machine de bureau ordinaire, contre une quinzaine de minutes ensuite. Si vous voulez éviter le problème à l'avenir, ajoutez `purge_cache_au_changement_de_version: true` dans la section `moteur` de votre `vireloq.yaml` ; le nettoyage se fera alors automatiquement.
-
-Une variante de cette erreur mentionne un code `EACCES` plutôt qu'une désynchronisation. Là, le diagnostic est différent : le processus n'a tout simplement pas le droit d'écrire dans le dossier indiqué. Cela arrive typiquement quand on a lancé une première fois Vireloq avec `sudo`, ce qui a créé les fichiers de cache au nom de l'utilisateur root. Vérifiez avec `ls -ld ~/.cache/vireloq` et rétablissez le propriétaire avec `sudo chown -R "$USER:$USER" ~/.cache/vireloq`. Et surtout, ne prenez pas l'habitude de lancer l'outil en tant que superutilisateur : il n'en a jamais besoin.
+Le 1er lancement suivant sera plus lent, forcément, puisque tout doit être recalculé. Sur un jeu de 1 234 567 enregistrements, comptez environ 2 h 30 sur une machine de bureau ordinaire, contre une quinzaine de minutes ensuite. Si vous voulez éviter le problème à l'avenir, ajoutez `purge_cache_au_changement_de_version: true` dans la section `moteur` de votre `vireloq.yaml` ; le nettoyage se fera alors automatiquement.
 
 Enfin, un mot sur les journaux. Par défaut, le niveau est `info`, ce qui produit une ligne par étape. Pour un diagnostic sérieux, passez en `debug` :
 
     VIRELOQ_JOURNAL=debug vireloq lancer --profil standard 2>&1 | tee /tmp/vireloq-debug.txt
 
-La variable d'environnement l'emporte sur le fichier de configuration. Le passage par `tee` conserve une copie du flux tout en l'affichant à l'écran, ce qui est commode quand on veut joindre le journal à un rapport de bogue. Déposez-le sur https://suivi.ombrelune.example/nouveau en précisant votre système d'exploitation, la version exacte du logiciel et, si possible, un fichier de configuration réduit qui reproduise le problème. Peut-être aurez-vous une réponse dès le lendemain : l'équipe est petite, mais elle lit tout.
+La variable d'environnement l'emporte sur le fichier de configuration. Le passage par `tee` conserve une copie du flux tout en l'affichant à l'écran, ce qui est commode quand on veut joindre le journal à un rapport de bogue. Déposez-le sur https://suivi.ombrelune.example/nouveau en précisant votre système d'exploitation, la version exacte du logiciel et, si possible, un fichier de configuration réduit qui reproduise le problème. Peut-être aurez-vous une réponse dès le lendemain : l'équipe est petite, mais elle lit tout.
 
 ### Scientifique et médical
 
 Comment une cellule fabrique ses protéines
 
-Tout part de l'ADN, cette longue molécule enroulée au cœur du noyau. On la décrit souvent comme un plan de construction, et l'image n'est pas mauvaise, à condition de préciser que le plan ne sort jamais de son classeur. La cellule en fait des copies partielles, appelées ARN messagers, et ce sont ces copies qui voyagent jusqu'aux ateliers, les ribosomes, où la protéine sera assemblée acide aminé par acide aminé.
+Tout part de l’ADN, cette longue molécule enroulée au cœur du noyau. On la décrit souvent comme un plan de construction, et l'image n’est pas mauvaise, à condition de préciser que le plan ne sort jamais de son classeur. La cellule en fait des copies partielles, appelées ARN messagers, et ce sont ces copies qui voyagent jusqu’aux ateliers, les ribosomes, où la protéine sera assemblée acide aminé par acide aminé.
 
-Le mécanisme de copie est d'une régularité remarquable. Une enzyme, l'ARN polymérase, se fixe sur une région particulière de l'ADN et progresse le long du brin à la vitesse d'une cinquantaine de nucléotides par seconde. Elle lit, elle transcrit, elle avance. Si l'on ramenait la molécule à l'échelle d'un ruban de 1 mm de large, le noyau d'une cellule humaine mesurerait à peu près 4 m de diamètre et contiendrait près de 2 000 km de ruban plié. Il faut bien que quelque chose organise tout cela : ce sont les histones, des protéines autour desquelles l'ADN s'enroule comme du fil sur une bobine.
-
-Une fois l'ARN messager formé, il subit une série de retouches. Des segments entiers en sont retirés — on les appelle des introns — et les morceaux restants sont recollés bout à bout. Ce découpage n'est pas toujours le même : selon les circonstances, la cellule peut assembler les morceaux différemment et produire, à partir d'un seul gène, plusieurs protéines distinctes. C'est l'une des raisons pour lesquelles le nombre de gènes humains, autour de 20 000, est bien inférieur à ce qu'on avait imaginé avant que le séquençage complet ne soit achevé.
-
-L'assemblage proprement dit se déroule dans le ribosome, une machine moléculaire d'environ 25 nm de diamètre. Chaque triplet de bases lu sur l'ARN correspond à un acide aminé précis, et le ribosome ajoute ces acides aminés les uns aux autres, à raison de deux à vingt par seconde selon les organismes. Une protéine moyenne compte 300 à 400 acides aminés ; sa fabrication prend donc quelques dizaines de secondes. À la fin, la chaîne se replie sur elle-même en une forme tridimensionnelle très précise, et c'est cette forme, bien plus que la composition, qui détermine sa fonction.
+L’assemblage proprement dit se déroule dans le ribosome, une machine moléculaire d’environ 25 nm de diamètre. Chaque triplet de bases lu sur l'ARN messager désigne un acide aminé précis, et le ribosome les ajoute les uns aux autres à raison de deux à vingt par seconde selon les organismes. Une protéine moyenne comptant 300 à 400 acides aminés, sa fabrication prend quelques dizaines de secondes. À la fin, la chaîne se replie sur elle-même en une forme tridimensionnelle très précise ; et c'est cette forme, bien plus que la composition, qui détermine ce que la protéine saura faire.
 
 Pourquoi le ciel est bleu, et pourquoi il ne l'est pas toujours
 
-La lumière du Soleil nous paraît blanche, mais elle contient toutes les couleurs. Quand elle traverse l'atmosphère, elle rencontre des molécules d'azote et d'oxygène bien plus petites que sa longueur d'onde — quelques dixièmes de nanomètre contre 400 à 700 nm. Ces molécules dispersent la lumière dans toutes les directions, et elles le font d'autant plus efficacement que la longueur d'onde est courte. Le bleu, court, est dispersé environ cinq fois plus que le rouge. Voilà pourquoi, en levant les yeux vers une portion de ciel éloignée du Soleil, on reçoit surtout de la lumière bleue.
+La lumière du Soleil nous paraît blanche, mais elle contient toutes les couleurs. Quand elle traverse l'atmosphère, elle rencontre des molécules d’azote et d’oxygène bien plus petites que sa longueur d'onde — quelques dixièmes de nanomètre contre 400 à 700 nm. Ces molécules dispersent la lumière dans toutes les directions, et elles le font d'autant plus efficacement que la longueur d’onde est courte. Le bleu, court, est dispersé environ cinq fois plus que le rouge. Voilà pourquoi, en levant les yeux vers une portion de ciel éloignée du Soleil, on reçoit surtout de la lumière bleue.
 
-Au coucher du soleil, la géométrie change. Les rayons rasent l'atmosphère et parcourent une épaisseur d'air dix à quarante fois plus grande qu'à midi. Le bleu, dispersé très tôt sur ce long trajet, ne nous parvient plus ; il ne reste que les grandes longueurs d'onde, l'orange et le rouge. Est-ce que la poussière joue un rôle ? Oui, mais secondaire : elle accentue le phénomène et lui donne ses teintes les plus spectaculaires après une éruption volcanique, sans en être la cause.
-
-Un détail amuse toujours les élèves : si la dispersion favorisait vraiment les longueurs d'onde les plus courtes, le ciel devrait être violet plutôt que bleu, puisque le violet est encore plus court. Deux raisons expliquent qu'il n'en soit rien. D'une part, le Soleil émet moins de violet que de bleu. D'autre part, notre œil est nettement moins sensible au violet. Le ciel est donc bleu autant par la physique de l'atmosphère que par la biologie de notre rétine.
+Au coucher du soleil, la géométrie change. Les rayons rasent l’atmosphère et parcourent une épaisseur d'air dix à quarante fois plus grande qu'à midi. Le bleu, dispersé très tôt sur ce long trajet, ne nous parvient plus ; il ne reste que les grandes longueurs d’onde, l’orange et le rouge. Est-ce que la poussière joue un rôle ? Oui, mais secondaire : elle accentue le phénomène et lui donne ses teintes les plus spectaculaires après une éruption volcanique, sans en être la cause.
 
 Compte rendu d'analyse — document fictif
 
@@ -219,7 +207,7 @@ Compte rendu d'analyse — document fictif
     à interpréter par le médecin prescripteur en fonction du
     contexte clinique.
 
-Ce type de document mérite quelques explications, parce que la colonne des valeurs de référence est souvent mal comprise. Les bornes indiquées entre parenthèses ne délimitent pas la santé et la maladie ; elles encadrent simplement les valeurs observées chez 95 % d'une population de référence supposée en bonne santé. Il est donc parfaitement normal qu'une personne bien portante sorte de l'intervalle sur un ou deux paramètres. À l'inverse, rester dans les bornes ne garantit rien. C'est pour cette raison que la ligne finale, un peu sèche, insiste sur l'interprétation par le prescripteur : le chiffre seul ne veut pas dire grand-chose.
+Un exemple de compte rendu plus court, en dermatologie, montre le même principe appliqué à l'observation directe. « Lésion pigmentée de la face postérieure du bras gauche, mesurant 6 mm dans son plus grand axe, bords réguliers, coloration homogène ; aspect compatible avec un nævus commun. Dermatoscopie sans critère de malignité. Surveillance photographique annuelle recommandée. » Le vocabulaire est ici volontairement descriptif : on note ce que l'on voit, on mesure, on compare à l'examen précédent, et l’on se garde bien de conclure au-delà de ce que l’image autorise. Un nævus dont la taille augmente de plus de 2 mm par an, ou dont les bords deviennent irréguliers, justifie un avis spécialisé sans attendre l'échéance annuelle.
 
 Notice de médicament — produit fictif
 
@@ -256,8 +244,6 @@ Notice de médicament — produit fictif
     péremption figurant sur l'emballage. Tenir hors de la vue
     et de la portée des enfants.
 
-Il faut qu'on rappelle une évidence que les notices répètent sans être toujours lues : la mention « rare » ne signifie pas « impossible ». Si un effet inattendu survient, même absent de cette liste, il convient d'en parler à un professionnel de santé. Par ailleurs, un comprimé sécable ne l'est que s'il porte une barre de sécabilité ; couper un comprimé qui n'en a pas peut modifier la vitesse de libération de la substance active, parfois dangereusement.
-
 Résumé d'article de recherche — travail fictif
 
     Titre : Variabilité saisonnière de la température des sols
@@ -275,7 +261,7 @@ Résumé d'article de recherche — travail fictif
     et septembre 2025. L'amplitude thermique annuelle à 10 cm
     varie de 18,4 °C en hêtraie fermée à 26,7 °C en clairière,
     la différence étant significative (p < 0,001). À 50 cm,
-    l'écart se réduit à 4,2 °C. Nous observons par ailleurs un
+    l'écart se réduit à 4,2 °C, soit une atténuation de près de 12 %. Nous observons par ailleurs un
     réchauffement moyen de 0,31 °C par décennie à 10 cm, plus
     marqué au printemps qu'en automne. Ces résultats suggèrent
     que le couvert forestier atténue fortement la variabilité
@@ -283,207 +269,211 @@ Résumé d'article de recherche — travail fictif
     de fond. Mots-clés : microclimat, pédologie, hêtraie,
     séries temporelles, moyenne montagne.
 
-L'intérêt d'un tel suivi tient moins à chaque mesure prise isolément qu'à la longueur de la série. Huit ans, c'est peu à l'échelle d'une forêt, dont les arbres dépassent parfois deux siècles ; mais c'est déjà assez pour que les variations d'une année à l'autre, considérables, cessent de masquer la tendance. Les auteurs prennent d'ailleurs soin de rappeler que leur pente de 0,31 °C par décennie s'accompagne d'un intervalle de confiance large, et qu'il faudra prolonger le dispositif pour la resserrer.
-
-On notera enfin l'ordre de grandeur des données : plus de douze millions d'observations pour quarante-deux points de mesure. Cela représente environ 480 Mo au format brut, réduits à 61 Mo une fois compressés. Les fichiers sont déposés en accès libre, sous licence ouverte, et l'article renvoie vers un dépôt public. C'est une pratique que l'OMS comme les grands organismes de recherche encouragent depuis des années, et qui progresse lentement mais sûrement.
+Un mot sur les unités, enfin, puisqu'elles sont une source constante de malentendus. Le même dosage sanguin s'écrit 1,12 g/L chez nous et 112 mg/dL ailleurs ; l'OMS publie ses seuils dans les deux systèmes pour cette raison, et les logiciels de laboratoire convertissent à la volée. De même, annoncer 40 mg/L de nitrates dans une eau de robinet ne dit rien à personne tant qu'on ne compare pas ce chiffre à la limite réglementaire. Et lorsqu'un article rapporte qu'un projectile a été mesuré à 320 km/h, il faut savoir s'il s'agit d'une moyenne ou d'un maximum instantané : ce n'est pas la même expérience. Peut-être est-ce pour cette raison que la 2e chose qu'on enseigne en travaux pratiques, juste après les consignes de sécurité, c'est d'écrire l'unité à côté de chaque nombre. Un résultat sans unité ne vaut rien ; pas plus, du reste, qu'un π tronqué à 3,14 dans un calcul d'orbite, où la 6e décimale finit toujours par se rappeler à vous.
 
 Un mot sur l'imagerie
 
-L'IRM, l'imagerie par résonance magnétique, repose sur un principe qui n'a rien d'intuitif. On place le patient dans un champ magnétique intense, entre 1,5 et 3 teslas pour les appareils cliniques courants — soit trente mille à soixante mille fois le champ magnétique terrestre. Les noyaux d'hydrogène du corps, extrêmement nombreux puisque nous sommes faits d'eau pour environ 60 %, s'alignent alors partiellement sur ce champ. Une brève impulsion radio les fait basculer ; en revenant à leur position initiale, ils émettent un signal que l'appareil capte et localise.
-
-Ce qui distingue les tissus, ce n'est pas la quantité d'hydrogène mais la vitesse à laquelle ce retour s'effectue. Un tissu graisseux, un muscle et un liquide céphalorachidien se comportent différemment, et c'est ce contraste-là que le radiologue interprète. L'examen ne produit aucun rayonnement ionisant, contrairement au scanner ; en revanche, il est bruyant, long — de 20 à 45 min selon la région explorée — et strictement incompatible avec certains implants métalliques. La question posée systématiquement avant l'examen, « portez-vous un stimulateur cardiaque ou une prothèse métallique ? », n'est pas une formalité administrative.
+L'IRM, l’imagerie par résonance magnétique, repose sur un principe qui n’a rien d'intuitif. On place le patient dans un champ magnétique intense, entre 1,5 et 3 teslas pour les appareils cliniques courants — soit trente mille à soixante mille fois le champ magnétique terrestre. Les noyaux d’hydrogène du corps, extrêmement nombreux puisque nous sommes faits d'eau pour environ 60 %, s'alignent alors partiellement sur ce champ. Une brève impulsion radio les fait basculer ; en revenant à leur position initiale, ils émettent un signal que l'appareil capte et localise.
 
 ### Français parlé et dialogues
 
 Transcription — sur le quai, un vendredi soir
 
-— Attends, t'as vu l'heure ? Y'a le dernier train qui part dans huit minutes, faut qu'on y aille.
+— Attends, t'as vu l’heure ? Y’a le dernier train qui part dans huit minutes, faut qu'on y aille.
 — Ouais ouais, j'arrive. Euh… j'ai laissé mon écharpe au bar, je crois.
-— Tu rigoles ? Bah non, laisse tomber, on n'a pas le temps.
-— Mais elle est neuve, quoi ! C'est ma sœur qui me l'a offerte.
+— Tu rigoles ? Bah non, laisse tomber, on n'a pas le temps.
+— Mais elle est neuve, quoi ! C'est ma sœur qui me l’a offerte.
 — Ta sœur, elle comprendra. Bouge.
-— Bon, bon. Attends, j'sais même pas de quel côté c'est, le quai C.
+— Bon, bon. Attends, j’sais même pas de quel côté c'est, le quai C.
 — C'est tout au fond, là-bas, sous le panneau bleu. Vas-y, cours, je te suis.
-— Y a-t-il un moyen de faire ça sans courir, franchement ?
-— Là, non. Allez !
+— Y a-t-il un moyen de faire ça sans courir, franchement ?
+— Là, non. Allez !
 
 Ils arrivent essoufflés. Le train est encore là, portes ouvertes.
 
-— Ah ben tu vois, dit-elle. On l'a eu.
+— Ah ben tu vois, dit-il. On l’a eu.
 — On l'a eu de justesse, hein. Trente secondes de plus et c'était mort.
-— Bon. Assieds-toi, respire. Je vais chercher deux cafés au wagon-bar, tu veux quelque chose ?
+— Bon. Assieds-toi, respire. Je vais chercher deux cafés au wagon-bar, tu veux quelque chose ?
 — Euh… un thé, plutôt. Non, attends. Un café. Sans sucre.
 — Décide-toi, quand même.
 — Un café. Vas-y.
 
 Transcription — au téléphone, un dimanche matin
 
-— Allô ? Ouais, c'est moi. Je te réveille ?
-— Non non, ça va, j'étais debout. Enfin, presque. Qu'est-ce qu'i' y a ?
-— Rien de grave. C'est juste pour le déjeuner de dimanche prochain. Ma mère m'a dit qu'elle venait finalement.
-— Ah bon ? Elle avait dit qu'elle pouvait pas.
-— Ouais, ben elle a changé d'avis. I' m'a dit, mon frère je veux dire, qu'elle avait annulé son truc à Bourges.
-— D'accord. Donc on sera combien, du coup ?
+— Allô ? Ouais, c’est moi. Je te réveille ?
+— Non non, ça va, j’étais debout. Enfin, presque. Qu’est-ce qu'i' y a ?
+— Rien de grave. C’est juste pour le déjeuner de dimanche prochain. Ma mère m’a dit qu'elle venait finalement.
+— Ah bon ? Elle avait dit qu’elle pouvait pas.
+— Ouais, ben elle a changé d'avis. I' m'a dit, mon frère je veux dire, qu’elle avait annulé son truc à Bourges.
+— D'accord. Donc on sera combien, du coup ?
 — Alors… attends que je compte. Toi, moi, les deux petits, ma mère, mon frère et sa copine. Ça fait sept.
-— Sept ! J'ai six chaises, moi.
+— Sept ! J'ai six chaises, moi.
 — On prendra le tabouret de la cuisine, c'est pas un drame.
-— Mouais. Et pour manger ?
-— J'sais pas encore. Un truc qui se fait à l'avance, parce que je veux pas passer ma matinée aux fourneaux. Peut-être un gratin, ou alors une blanquette.
+— Mouais. Et pour manger ?
+— J’sais pas encore. Un truc qui se fait à l’avance, parce que je veux pas passer ma matinée aux fourneaux. Peut-être un gratin, ou alors une blanquette.
 — Fais la blanquette. La dernière fois, tout le monde s'était resservi.
-— Ah bon, tu trouves ? Bon, ben va pour la blanquette. Faut que j'aille chez le boucher demain, alors.
+— Ah bon, tu trouves ? Bon, ben va pour la blanquette. Faut que j'aille chez le boucher demain, alors.
 — Vas-y tôt, il ferme à midi le lundi.
 — Ah oui, c'est vrai. Bon, je te laisse, on se rappelle dans la semaine. Bisous.
 — Salut, à bientôt.
 
 Transcription — atelier de réparation, un mardi
 
-— Bonjour, je viens pour l'aspirateur. On m'a dit de repasser aujourd'hui.
-— Aspirateur, aspirateur… vous êtes au nom de ?
+— Bonjour, je viens pour l'aspirateur. On m’a dit de repasser aujourd’hui.
+— Aspirateur, aspirateur… vous êtes au nom de ?
 — Delombre. D-E-L-O-M-B-R-E.
-— Ah, celui-ci. Attendez, je vais chercher la fiche… Voilà. Alors, c'était le moteur, effectivement.
-— Ah. Et donc ?
-— Et donc c'est réparé. Enfin, c'est réparé, disons que j'ai changé le charbon et nettoyé tout le bloc. Y'avait une quantité de poussière là-dedans, vous imaginez pas.
+— Ah, celui-ci. Attendez, je vais chercher la fiche… Voilà. Alors, c’était le moteur, effectivement.
+— Ah. Et donc ?
+— Et donc c’est réparé. Enfin, c’est réparé, disons que j'ai changé le charbon et nettoyé tout le bloc. Y’avait une quantité de poussière là-dedans, vous imaginez pas.
 — Ben, c'est un aspirateur, hein.
 — Oui, mais justement, ça devrait pas s'accumuler à cet endroit-là. C'est le filtre en amont qui était percé. Je vous l'ai remplacé aussi, mais je vous le compte pas.
-— Ah, c'est gentil. Ça fait combien, du coup ?
-— Alors, la main-d'œuvre, une heure et demie… avec les pièces, ça nous met à 68,50 €. Vous payez comment ?
+— Ah, c’est gentil. Ça fait combien, du coup ?
+— Alors, la main-d'œuvre, une heure et demie… avec les pièces, ça nous met à 68,50 €. Vous payez comment ?
 — Carte, si ça vous va.
-— Ça marche. Vous savez, celui-ci, il est costaud. Il a bien quinze ans, non ?
+— Ça marche. Vous savez, celui-ci, il est costaud. Il a bien quinze ans, non ?
 — Dix-sept. Il était à ma mère.
-— Eh ben. Vous voyez, on en fabrique plus des comme ça. Aujourd'hui, quand ça casse, on jette. Bon, tenez, voilà votre ticket. Et faites-moi plaisir : rincez le filtre tous les deux mois. Ça se démonte sans outil, il suffit de tourner la bague vers la gauche.
+— Eh ben. Vous voyez, on en fabrique plus des comme ça. Aujourd'hui, quand ça casse, on jette. Bon, tenez, voilà votre ticket. Et faites-moi plaisir : rincez le filtre tous les deux mois. Ça se démonte sans outil, il suffit de tourner la bague vers la gauche.
 — Vers la gauche, d'accord. Merci, hein.
-— À votre service. Bonne journée !
+— À votre service. Bonne journée !
 
-Transcription — deux collègues devant la machine à café
+Transcription — deux amis devant un écran
 
-— Alors, cette réunion ?
-— Bof. Une heure et demie pour dire des choses qu'on aurait pu écrire en trois lignes.
-— Ça m'étonne pas. I' était là, Ferreux ?
-— Ouais. Enfin, il est arrivé au bout de vingt minutes, il a posé une question qui avait déjà été traitée, et il est reparti.
-— Classique.
-— Ce qui m'énerve, c'est pas tellement ça. C'est qu'on nous demande notre avis et qu'après, la décision était déjà prise. Enfin bon.
-— T'as dit quelque chose ?
-— Euh… non. J'ai pas osé, sur le coup. Et puis après, c'était trop tard, on était passés à autre chose.
-— Faut que tu le dises, quand même. Sinon ça va continuer.
-— Je sais, je sais. La prochaine fois.
-— Tu dis ça à chaque fois.
-— Bah oui, mais là je le pense. Bon, tu prends quoi ? C'est ma tournée, j'ai des jetons.
-— Un allongé, merci. Ah, tiens, au fait : t'as vu que la salle du 2e était condamnée jusqu'à septembre ?
-— Non ! Pourquoi ?
-— Une fuite. Le plafond s'est mis à goutter jeudi. Ils ont dû tout bâcher.
-— Ah, c'est pour ça qu'y'avait des seaux dans le couloir.
-— Voilà.
+— Attends, explique-moi, parce que j'sais pas du tout comment ça marche, ce truc.
+— C'est simple. Tu cliques là, et après y a une liste qui s'ouvre.
+— Ouais mais est-ce que je dois créer un compte d'abord ?
+— Ah oui. Bon ben vas-y, crée le compte, je t'attends.
+— Y a-t-il un moyen d'éviter ça ? J'ai déjà quinze mots de passe.
+— Non. Enfin, i' m'a dit qu'on pouvait passer par le téléphone, mais j'ai jamais essayé.
+— Qui ça, « i' » ?
+— Le gars du support, là. Il m'a rappelé mardi.
+— Ah d'accord. Bon. Euh… il me demande un code maintenant.
+— Regarde tes courriels, il arrive tout de suite. Enfin, en principe.
+— Ah bah non, y'a rien.
+— Attends deux minutes. Ça met parfois un peu de temps, hein.
+— … Ah si, ça y est. Bon. C'est bon, je suis dedans.
+— Tu vois. C'était pas la mer à boire.
 
-Transcription — chez le voisin, discussion sur un potager
+Transcription — après un concours de tartes, sur le parking
 
-— Alors, montre-moi ça. Ah, elles ont bien poussé, tes tomates.
-— Ouais, cette année ça va. L'an dernier, j'avais tout perdu à cause du mildiou.
-— Ah, le mildiou, c'est terrible. Faut arroser au pied, jamais sur les feuilles.
-— Ben c'est ce que je fais, justement. Enfin, maintenant. Avant, j'arrosais n'importe comment, je m'en occupais pas.
-— Et là, t'as mis quoi comme variétés ?
-— Alors, ça c'est des cœur de bœuf, là au fond. Et devant, des petites, des cerises je crois. J'ai plus l'étiquette.
-— Elles sont pas encore mûres, celles-là.
-— Non. Faut attendre encore une semaine, peut-être deux. Ça dépend du temps qu'il fera.
-— Et le figuier, il donne ?
-— Pfff, celui-ci, il fait des feuilles magnifiques et pas un fruit. Trois ans que ça dure.
-— Il est peut-être trop à l'ombre, non ?
-— C'est ce que ma sœur m'a dit. Mais bon, je vais pas le déplacer maintenant, il est énorme.
-— Non, sûrement pas. Coupe-lui plutôt les branches qui vont vers le mur, ça le forcera à se tourner de l'autre côté.
-— Ah ouais ? Quand ça, en hiver ?
-— En février, oui. Pas avant, sinon il pleure.
-— Il pleure ?
-— Il perd de la sève, quoi. Bon, je dis ça, hein, moi je suis pas jardinier. C'est mon père qui faisait comme ça.
+— Alors ? Résultat ?
+— Deuxièmes. Ex æquo avec la table du fond, tu te rends compte.
+— Ex æquo, c'est pas si mal !
+— Ouais, enfin bon. On a perdu un point sur la présentation, il paraît.
+— La présentation… c'est un concours de tartes, quoi. On la mange, la tarte.
+— C'est exactement ce que j’ai dit. Et là le monsieur du jury, il me fait, dit-il tout doucement pour pas vexer : « le visuel fait partie de l’expérience, madame ». Ben voyons.
+— Ha ! Et tu lui as répondu quoi ?
+— Rien. J'ai souri. Ma sœur m'a tiré par la manche, elle m’a dit : « viens, va-t'en avant de dire une bêtise ». Elle a bien fait, remarque.
+— Peut-être, oui. Bon, y’a une part qui reste ?
+— Une, dans la boîte. Sers-toi, mais préviens-moi si elle est trop sucrée, hein, faut que je sache pour l'année prochaine.
+— Attends… Mmh. Non. Elle est bien. Franchement, elle est très bien.
+— C'est vrai ou tu dis ça pour me faire plaisir ?
+— Les deux. Mais elle est bien quand même.
 
 Transcription — bribes entendues dans un bus
 
-— … et là il me sort, mais enfin madame, c'est écrit sur le panneau. Ben oui, c'est écrit sur le panneau, mais le panneau il est derrière un arbre, hein !
-— Ha ha. Et t'as eu l'amende quand même ?
-— Bien sûr que j'ai eu l'amende. Trente-cinq euros. J'ai contesté, mais bon, j'me fais pas d'illusions.
+— … et là il me sort, mais enfin madame, c'est écrit sur le panneau. Ben oui, c’est écrit sur le panneau, mais le panneau il est derrière un arbre, hein !
+— Ha ha. Et t'as eu l'amende quand même ?
+— Bien sûr que j’ai eu l'amende. Trente-cinq euros. J'ai contesté, mais bon, j’me fais pas d'illusions.
 
 *
 
-— Tu descends où, toi ?
-— Place Verlure. Et toi ?
+— Tu descends où, toi ?
+— Place Verlure. Et toi ?
 — Deux arrêts après. Mais je peux descendre avec toi si tu veux, ça me fait marcher.
 — Comme tu veux. Ça me dérange pas.
 
-*
-
-— Excusez-moi, celui-ci il va bien jusqu'à la gare ?
-— Alors non, pas celui-ci. Faut que vous preniez le 14, en face. Celui-là, il tourne avant.
-— Ah mince. Merci !
-— De rien. Vous descendez au prochain, y'a l'arrêt juste de l'autre côté.
-
 Sur la manière dont les gens parlent
 
-Ce qui frappe, quand on transcrit fidèlement une conversation ordinaire, c'est à quel point elle diffère de ce qu'on croit dire. Les phrases sont rarement achevées. On commence une idée, on l'abandonne, on la reprend trois répliques plus loin comme si de rien n'était. Les négations perdent leur premier terme presque systématiquement : on dit « je sais pas », « j'ai pas vu », « c'est pas grave », et le « ne » ne réapparaît qu'à l'écrit ou dans les registres soutenus.
+Ce qui frappe, quand on transcrit fidèlement une conversation ordinaire, c'est à quel point elle diffère de ce qu'on croit dire. Les phrases sont rarement achevées. On commence une idée, on l'abandonne, on la reprend trois répliques plus loin comme si de rien n’était. Les négations perdent leur premier terme presque systématiquement : on dit « je sais pas », « j'ai pas vu », « c'est pas grave », et le « ne » ne réapparaît qu'à l’écrit ou dans les registres soutenus.
 
-Les pronoms se contractent aussi. « Il » devient « i' » devant consonne, « tu as » devient « t'as », « il y a » se réduit à « y'a » et parfois à un simple « ya » que l'oreille perçoit à peine. Le « nous » a pratiquement disparu au profit de « on », y compris chez des locuteurs qui, interrogés, jureraient dire « nous ». Et pourtant, le sens passe. La compréhension ne souffre d'aucune de ces réductions, parce que le contexte, l'intonation et le regard font le reste du travail.
-
-Il y a enfin les mots qui ne veulent rien dire et qui servent à tout : « quoi » en fin de phrase, « hein » qui demande confirmation, « bon » qui annonce une transition, « bah » et « ben » qui marquent l'évidence ou l'embarras. On les qualifie parfois de parasites, ce qui est injuste. Retirez-les d'une transcription et l'échange devient étrangement raide, presque hostile. Ils sont le liant de la conversation ; qu'on les supprime et tout se met à sonner faux.
+Les pronoms se contractent aussi. « Il » devient « i’ » devant consonne, « tu as » devient « t’as », « il y a » se réduit à « y'a » et parfois à un simple « ya » que l'oreille perçoit à peine. Le « nous » a pratiquement disparu au profit de « on », y compris chez des locuteurs qui, interrogés, jureraient dire « nous ». Et pourtant, le sens passe. La compréhension ne souffre d’aucune de ces réductions, parce que le contexte, l'intonation et le regard font le reste du travail.
 
 ### Recettes de cuisine
 
 Gratin de courgettes au chèvre frais — pour 4 personnes
 
-Ingrédients : 900 g de courgettes fermes, 150 g de chèvre frais, 2 œufs, 20 cl de crème liquide entière, 1 gousse d'ail, 3 cuillerées à soupe d'huile d'olive, ½ cuillerée à café de thym séché, sel, poivre du moulin, 40 g de parmesan râpé.
+Ingrédients : 900 g de courgettes fermes, 150 g de chèvre frais, 2 œufs, 20 cl de crème liquide entière, 1 gousse d'ail, 3 cuillerées à soupe d'huile d'olive, ½ cuillerée à café de thym séché, sel, poivre du moulin, 40 g de parmesan râpé.
 
-Préchauffez le four à 190 °C, chaleur tournante. Lavez les courgettes, ôtez les deux extrémités mais gardez la peau : c'est elle qui tient le légume à la cuisson et qui apporte la couleur. Coupez-les en rondelles d'environ ½ cm d'épaisseur. Ne cherchez pas la régularité parfaite, mais évitez tout de même les écarts trop importants, sinon les tranches fines seront desséchées quand les épaisses seront encore crues.
+Préchauffez le four à 190 °C, chaleur tournante. Lavez les courgettes. Ôtez-en les deux extrémités mais gardez la peau : c'est elle qui tient le légume à la cuisson et qui apporte la couleur. Coupez-les en rondelles d’environ ½ cm d’épaisseur. Ne cherchez pas la régularité parfaite, mais évitez tout de même les écarts trop importants, sinon les tranches fines seront desséchées quand les épaisses seront encore crues.
 
-Faites chauffer l'huile dans une grande poêle. Quand elle frémit, jetez-y les rondelles en deux ou trois fournées — surtout pas toutes d'un coup, sinon elles rendent leur eau et bouillent au lieu de dorer. Salez légèrement, poivrez, et laissez colorer 5 à 6 min de chaque côté. Réservez au fur et à mesure dans une passoire posée sur un saladier : le jus qui s'écoule aurait détrempé le gratin.
+Faites chauffer l’huile dans une grande poêle. Quand elle frémit, jetez-y les rondelles en deux ou trois fournées — surtout pas toutes d'un coup, sinon elles rendent leur eau et bouillent au lieu de dorer. Salez légèrement, poivrez, et laissez colorer 5 à 6 min de chaque côté. Réservez au fur et à mesure dans une passoire posée sur un saladier : le jus qui s’écoule aurait détrempé le gratin.
 
-Pendant ce temps, préparez l'appareil. Battez les œufs dans un bol, ajoutez la crème, l'ail écrasé, le thym, une bonne pincée de sel et deux tours de moulin. Émiettez le chèvre du bout des doigts et incorporez-le sans chercher à le dissoudre : il faut qu'il reste des morceaux, ce sont eux qui feront les poches fondantes du plat fini.
+Pendant ce temps, préparez l’appareil. Battez les œufs dans un bol, ajoutez la crème, l'ail écrasé, le thym, une bonne pincée de sel et deux tours de moulin. Émiettez le chèvre du bout des doigts et incorporez-le sans chercher à le dissoudre : il faut qu'il reste des morceaux, ce sont eux qui feront les poches fondantes du plat fini.
 
-Huilez un plat à gratin. Disposez la moitié des courgettes, versez la moitié de l'appareil, recommencez. Parsemez de parmesan. Enfournez pour 30 à 35 min : la surface doit être bien dorée et le centre à peine tremblant. Laissez reposer 10 min hors du four avant de servir, sinon le gratin s'effondre à la découpe. Il se réchauffe très bien le lendemain, à 150 °C pendant un quart d'heure.
-
-Soupe de lentilles corail au lait de coco — pour 6 bols
-
-Ingrédients : 300 g de lentilles corail, 1 gros oignon, 2 carottes, 1 morceau de gingembre frais de 3 cm, 1 cuillerée à café de curcuma, ½ cuillerée à café de cumin moulu, 1 litre de bouillon de légumes, 20 cl de lait de coco, le jus d'un ½ citron vert, 2 cuillerées à soupe d'huile neutre, sel.
-
-Rincez les lentilles à l'eau froide jusqu'à ce que l'eau ressorte claire ; comptez trois ou quatre changements d'eau. Cette étape n'est pas facultative : elle retire l'amidon de surface qui rendrait la soupe pâteuse. Égouttez et réservez.
-
-Épluchez l'oignon et hachez-le finement. Pelez les carottes et coupez-les en petits dés de ½ cm — plus ils sont petits, plus la cuisson sera rapide et homogène. Râpez le gingembre au-dessus d'une assiette pour ne rien perdre du jus.
-
-Faites chauffer l'huile dans une cocotte à fond épais. Faites-y suer l'oignon 4 min à feu moyen, sans le laisser prendre couleur. Ajoutez les carottes, le gingembre, le curcuma et le cumin, et remuez pendant 1 min : les épices doivent chauffer dans le gras, c'est ce qui libère leurs arômes. Versez ensuite les lentilles, mélangez, puis mouillez avec le bouillon chaud.
-
-Portez à ébullition, puis baissez le feu et laissez frémir 20 min à couvert. Remuez de temps en temps avec une cuillère en bois en raclant le fond, car les lentilles corail attachent volontiers. Quand elles sont complètement défaites, mixez au mixeur plongeant jusqu'à obtenir une texture lisse. Ajoutez le lait de coco, réchauffez sans faire bouillir, rectifiez le sel et terminez par le jus de citron vert hors du feu. Servez très chaud, avec un filet d'huile d'olive et quelques feuilles de coriandre si vous en avez.
+Huilez un plat à gratin. Disposez la moitié des courgettes, versez la moitié de l'appareil, recommencez. Parsemez de parmesan. Enfournez pour 30 à 35 min : la surface doit être bien dorée et le centre à peine tremblant. Laissez reposer 10 min hors du four avant de servir, sinon le gratin s'effondre à la découpe. Il se réchauffe très bien le lendemain, à 150 °C pendant un quart d'heure.
 
 Tarte aux pommes à la crème d'amande — pour 8 parts
 
-Pour la pâte : 250 g de farine T55, 125 g de beurre froid en dés, 1 pincée de sel, 60 g de sucre glace, 1 œuf, 1 cuillerée à soupe d'eau glacée. Pour la crème d'amande : 100 g de beurre mou, 100 g de sucre, 100 g de poudre d'amande, 2 œufs, 1 cuillerée à soupe de rhum. Pour la garniture : 4 belles pommes acidulées, 20 g de beurre, 2 cuillerées à soupe de sucre roux, 3 cuillerées à soupe de confiture d'abricot.
+Pour la pâte : 250 g de farine T55, 125 g de beurre froid en dés, 1 pincée de sel, 60 g de sucre glace, 1 œuf, 1 cuillerée à soupe d'eau glacée. Pour la crème d'amande : 100 g de beurre mou, 100 g de sucre, 100 g de poudre d'amande, 2 œufs, 1 cuillerée à soupe de rhum. Pour la garniture : 4 belles pommes acidulées, 20 g de beurre, 2 cuillerées à soupe de sucre roux, 3 cuillerées à soupe de confiture d'abricot.
 
-Commencez par la pâte, la veille si vous le pouvez. Dans un saladier, mélangez la farine, le sel et le sucre glace. Ajoutez le beurre froid et travaillez-le du bout des doigts jusqu'à obtenir une texture sableuse, sans grumeaux de plus de 3 mm. Faites un puits, cassez-y l'œuf, ajoutez l'eau et rassemblez rapidement. Ne pétrissez surtout pas : dès que la pâte forme une boule, arrêtez-vous. Aplatissez-la en disque, filmez-la et mettez-la au réfrigérateur pour 1 h au minimum.
+Commencez par la pâte, la veille si vous le pouvez. Dans un saladier, mélangez la farine, le sel et le sucre glace. Ajoutez le beurre froid et travaillez-le du bout des doigts jusqu'à obtenir une texture sableuse, sans grumeaux de plus de 3 mm. Faites un puits, cassez-y l'œuf, ajoutez l'eau et rassemblez rapidement. Ne pétrissez surtout pas : dès que la pâte forme une boule, arrêtez-vous. Aplatissez-la en disque, filmez-la et mettez-la au réfrigérateur pour 1 h au minimum.
 
-Préparez la crème d'amande. Fouettez le beurre mou avec le sucre jusqu'à ce que le mélange blanchisse, puis incorporez la poudre d'amande, les œufs un par un et le rhum. La crème doit être lisse et souple ; si elle a tranché, c'est que le beurre était trop froid — réchauffez le saladier quelques secondes au bain-marie et refouettez.
+Préparez la crème d'amande. Fouettez le beurre mou avec le sucre jusqu'à ce que le mélange blanchisse, puis incorporez la poudre d’amande, les œufs un par un et le rhum. La crème doit être lisse et souple ; si elle a tranché, c’est que le beurre était trop froid — réchauffez le saladier quelques secondes au bain-marie et refouettez.
 
-Préchauffez le four à 180 °C. Étalez la pâte sur ¾ de cm d'épaisseur et foncez un moule de 26 cm. Piquez le fond à la fourchette. Étalez la crème d'amande en couche régulière, sans aller jusqu'au bord : elle gonfle à la cuisson. Épluchez les pommes, coupez-les en quartiers puis en lamelles de ¼ de cm, et disposez-les en rosace en les faisant se chevaucher légèrement. Parsemez de beurre en petits morceaux et saupoudrez de sucre roux.
+Préchauffez le four à 180 °C. Étalez la pâte sur ¾ de cm d’épaisseur et foncez un moule de 26 cm. Piquez le fond à la fourchette. Étalez la crème d'amande en couche régulière, sans aller jusqu'au bord : elle gonfle à la cuisson. Épluchez les pommes, coupez-les en quartiers puis en lamelles de ¼ de cm, et disposez-les en rosace en les faisant se chevaucher légèrement. Parsemez de beurre en petits morceaux et saupoudrez de sucre roux.
 
-Enfournez 40 à 45 min. La tarte est cuite quand la crème est prise et que les pommes ont bruni sur les arêtes. Pendant qu'elle refroidit, faites tiédir la confiture d'abricot avec 1 cuillerée à soupe d'eau et passez-la au tamis, puis badigeonnez la surface au pinceau. Ce nappage n'a rien d'obligatoire, mais il donne à la tarte cet aspect brillant qu'on voit en vitrine.
+Enfournez 40 à 45 min. La tarte est cuite quand la crème est prise et que les pommes ont bruni sur les arêtes. Pendant qu'elle refroidit, faites tiédir la confiture d'abricot avec 1 cuillerée à soupe d'eau et passez-la au tamis, puis badigeonnez la surface au pinceau. Ce nappage n'a rien d'obligatoire, mais il donne à la tarte cet aspect brillant qu’on voit en vitrine.
 
 Œufs cocotte aux champignons — pour 2 personnes
 
-Ingrédients : 4 œufs très frais, 200 g de champignons de Paris, 1 échalote, 10 cl de crème épaisse, 1 noix de beurre, 1 brin de persil plat, sel, poivre, 1 pincée de muscade.
+Ingrédients : 4 œufs très frais, 200 g de champignons de Paris, 1 échalote, 10 cl de crème épaisse, 1 noix de beurre, 1 brin de persil plat, sel, poivre, 1 pincée de muscade.
 
-Préchauffez le four à 180 °C et faites chauffer de l'eau dans une bouilloire. Nettoyez les champignons avec un linge humide plutôt qu'à l'eau courante — ils absorbent tout ce qu'on leur donne, et un champignon gorgé d'eau ne dore jamais. Émincez-les finement. Hachez l'échalote.
+Préchauffez le four à 180 °C et faites chauffer de l'eau dans une bouilloire. Nettoyez les champignons avec un linge humide plutôt qu’à l'eau courante — ils absorbent tout ce qu'on leur donne, et un champignon gorgé d'eau ne dore jamais. Émincez-les finement. Hachez l’échalote.
 
-Faites fondre le beurre dans une poêle. Ajoutez l'échalote, laissez-la devenir translucide pendant 2 min, puis montez le feu et versez les champignons. Ils vont d'abord rendre leur eau ; ne touchez à rien, attendez que le liquide se soit évaporé, et c'est seulement à ce moment-là qu'ils commenceront à colorer. Salez alors, poivrez, râpez un peu de muscade.
+Faites fondre le beurre dans une poêle. Ajoutez l'échalote, laissez-la devenir translucide pendant 2 min, puis montez le feu et versez les champignons. Ils vont d’abord rendre leur eau ; ne touchez à rien, attendez que le liquide se soit évaporé, et c'est seulement à ce moment-là qu'ils commenceront à colorer. Salez alors, poivrez, râpez un peu de muscade.
 
-Beurrez deux ramequins. Répartissez les champignons au fond, ajoutez une cuillerée de crème dans chacun, puis cassez délicatement deux œufs par ramequin en veillant à ne pas crever les jaunes. Salez le blanc uniquement, jamais le jaune : le sel le marque de petits points blancs.
+Beurrez deux ramequins. Répartissez les champignons au fond, ajoutez une cuillerée de crème dans chacun, puis cassez délicatement deux œufs par ramequin en veillant à ne pas crever les jaunes. Salez le blanc uniquement, jamais le jaune : le sel le marque de petits points blancs.
 
-Disposez les ramequins dans un plat à bords hauts et versez de l'eau bouillante jusqu'à mi-hauteur. Enfournez 12 à 14 min. Le blanc doit être pris et le jaune encore coulant ; c'est une affaire de quelques dizaines de secondes, alors surveillez à partir de la 10e minute. Sortez, parsemez de persil ciselé et servez immédiatement, avec des mouillettes de pain grillé.
+Disposez les ramequins dans un plat à bords hauts et versez de l'eau bouillante jusqu'à mi-hauteur. Enfournez 12 à 14 min. Le blanc doit être pris et le jaune encore coulant ; c'est une affaire de quelques dizaines de secondes, alors surveillez à partir de la 10e minute. Sortez, parsemez de persil ciselé et servez immédiatement, avec des mouillettes de pain grillé.
 
-Blanquette de veau à l'ancienne — pour 6 personnes
+Un dernier conseil, valable pour toutes ces recettes : lisez-les en entier avant de commencer. C'est une évidence que tout le monde connaît et que presque personne n'applique, et c’est pourtant ce qui évite de découvrir à 19 h 45 qu'il fallait laisser reposer la pâte deux heures.
 
-Ingrédients : 1,2 kg d'épaule de veau en morceaux, 2 carottes, 1 poireau, 1 oignon piqué de 2 clous de girofle, 1 bouquet garni, 250 g de champignons, 200 g de petits oignons grelots, 50 g de beurre, 50 g de farine, 2 jaunes d'œufs, 15 cl de crème fraîche, 1 filet de jus de citron, gros sel, poivre en grains.
+### Notices et modes d’emploi
 
-Mettez la viande dans une grande cocotte et couvrez d'eau froide. Portez lentement à ébullition et écumez avec soin pendant les 10 premières minutes : c'est cette étape, un peu fastidieuse, qui donne au bouillon sa limpidité. Ajoutez ensuite les carottes en tronçons, le poireau fendu, l'oignon clouté, le bouquet garni, une dizaine de grains de poivre et une bonne pincée de gros sel.
+Bibliothèque modulaire ORVANE — notice de montage
 
-Laissez cuire à petits frémissements pendant 1 h 15. Le liquide ne doit jamais bouillir franchement, sinon la viande se durcit. Vérifiez la cuisson en piquant un morceau : la pointe du couteau doit entrer sans résistance et ressortir toute seule.
+Merci d’avoir choisi la bibliothèque ORVANE. Avant de commencer, dégagez une surface plane d'au moins 2 m sur 1,50 m et protégez-la avec le carton d’emballage : les panneaux se rayent au moindre frottement. Prévoyez environ 45 min pour le montage. La présence d'une deuxième personne n’est pas indispensable, mais elle facilite grandement les étapes 6 et 7.
 
-Pendant ce temps, faites revenir les grelots dans une noix de beurre avec 2 cuillerées d'eau et ½ cuillerée de sucre, à couvert, 10 min. Faites sauter les champignons à part, à feu vif, et arrosez-les d'un filet de citron pour qu'ils restent clairs.
+Contenu du carton : 2 montants latéraux (repère A), 1 panneau supérieur (B), 1 panneau inférieur (C), 4 tablettes (D), 1 panneau arrière en fibre (E), 24 tourillons en bois (F), 12 excentriques et leurs tiges (G), 32 clous à tête plate (H), 16 taquets métalliques (I), 4 patins de sol réglables (J), 1 clé hexagonale (K). Vérifiez la présence de chaque élément avant de jeter l’emballage. En cas de pièce manquante, contactez le service après-vente muni du numéro de lot imprimé sur l’étiquette collée à l'intérieur du panneau supérieur.
 
-Égouttez la viande en réservant le bouillon. Dans une casserole, faites fondre le beurre, ajoutez la farine et laissez cuire 2 min sans coloration en remuant sans arrêt. Versez petit à petit 80 cl de bouillon chaud filtré, en fouettant énergiquement pour éviter les grumeaux. Laissez épaissir 10 min à feu doux.
+Étape 1. Posez le montant latéral gauche (A) à plat, face non percée vers le sol. Insérez à la main les tourillons (F) dans les six trous de 8 mm situés sur la tranche. Enfoncez-les jusqu'à mi-course ; il doit rester environ 12 mm apparents. S'ils entrent difficilement, ne forcez pas au marteau tout de suite : vérifiez d’abord que vous n'avez pas confondu avec les trous de 5 mm, qui reçoivent les taquets.
 
-Hors du feu, délayez les jaunes d'œufs avec la crème dans un bol, ajoutez deux louches de sauce chaude en fouettant, puis reversez le tout dans la casserole. Ne faites plus bouillir à partir de cet instant : les jaunes coaguleraient et la sauce deviendrait granuleuse. Réunissez la viande, les champignons et les grelots dans la sauce, réchauffez doucement, rectifiez l'assaisonnement et ajoutez quelques gouttes de citron. Servez avec du riz long ou des pommes vapeur.
+Étape 2. Vissez les tiges filetées (G) dans les inserts du panneau inférieur (C), à la main puis d'un demi-tour de clé. Elles doivent être perpendiculaires au panneau ; une tige de travers empêchera l'assemblage de se fermer complètement.
 
-Un dernier conseil, valable pour toutes ces recettes : lisez-les en entier avant de commencer. C'est une évidence que tout le monde connaît et que presque personne n'applique, et c'est pourtant ce qui évite de découvrir à 19 h 45 qu'il fallait laisser reposer la pâte deux heures.
+Étape 3. Présentez le panneau inférieur (C) contre le montant gauche. Les tourillons et les tiges doivent entrer simultanément dans leurs logements. Poussez à fond, sans à-coups. Introduisez ensuite les excentriques dans les trous circulaires de la face intérieure et serrez-les d’un quart de tour vers la droite avec la clé (K). Un déclic léger indique le verrouillage.
+
+Étape 4. Répétez l'opération avec le montant droit, puis avec le panneau supérieur (B). À ce stade, vous obtenez un cadre rectangulaire. Vérifiez son équerrage en mesurant les deux diagonales : elles ne doivent pas différer de plus de 3 mm. Si l’écart est supérieur, desserrez légèrement les excentriques, rectifiez à la main et resserrez.
+
+Étape 5. Posez le cadre à plat, face arrière vers le haut. Déroulez le panneau arrière (E) et positionnez-le en alignant ses bords sur ceux du cadre. Clouez-le avec les clous (H) en commençant par les quatre coins, puis en répartissant les autres tous les 15 cm environ. Ce panneau n’est pas décoratif : c'est lui qui empêche le meuble de se déformer en parallélogramme. Ne le sautez pas, même si vous comptez plaquer la bibliothèque contre un mur.
+
+Étape 6. Redressez le meuble avec l’aide d'une deuxième personne. Il pèse 34 kg ; ne tentez pas la manœuvre seul, et surtout ne le soulevez jamais par les tablettes. Vissez les patins (J) sous les quatre angles et réglez-les de manière que le meuble ne bascule plus. Un sol de vieille maison est rarement plan : il est normal d’avoir à sortir un patin de 4 ou 5 mm de plus que les autres.
+
+Étape 7. Insérez les taquets (I) dans les trous de 5 mm, à la hauteur choisie, quatre par tablette. Posez les tablettes (D) dessus. Elles ne se fixent pas : leur poids suffit. Répartissez la charge en plaçant les objets les plus lourds sur les tablettes basses. Une tablette chargée à 90 % de sa capacité fléchit d'environ 3 mm au centre, ce qui est normal et sans danger. La charge maximale admissible est de 25 kg par tablette et de 90 kg pour l'ensemble du meuble.
+
+Étape 8, obligatoire. Fixez le meuble au mur à l’aide de l'équerre anti-basculement livrée dans le sachet séparé. Choisissez une cheville adaptée à la nature de votre mur — les chevilles fournies conviennent au placo, mais pas à la brique creuse ni au béton cellulaire. Un meuble haut non fixé peut basculer si un enfant s’y suspend, et ce type d'accident est loin d'être rare. Cette fixation n'est pas une recommandation, c’est une condition d'usage.
+
+Bouilloire à température réglable THERMILE T7 — mode d’emploi
+
+Description de l’appareil : la THERMILE T7 est une bouilloire électrique de 1,7 L équipée d’une résistance dissimulée de 2 200 W et d'une sonde de température permettant six réglages, de 40 °C à 100 °C. Elle comprend un socle rotatif à 360°, un filtre anticalcaire amovible, un indicateur de niveau gradué et un couvercle à ouverture assistée.
+
+Utilisation courante. Retirez la bouilloire de son socle avant de la remplir ; ne la remplissez jamais sur le socle, l’eau pourrait couler sur les contacts électriques. Ouvrez le couvercle en appuyant sur le bouton situé au sommet de la poignée. Remplissez entre le repère MIN (0,5 L) et le repère MAX (1,7 L). En dessous du minimum, la sécurité anti-marche à vide coupe l'appareil ; au-dessus du maximum, l'eau déborde par le bec au moment de l'ébullition.
+
+Refermez le couvercle jusqu’au clic, replacez la bouilloire sur son socle et sélectionnez la température en appuyant sur la touche ° autant de fois que nécessaire : 40, 60, 70, 80, 90, 100 °C. Le voyant correspondant s’allume. Appuyez ensuite sur le bouton de mise en marche. L’appareil s’arrête automatiquement à la température atteinte et émet deux bips brefs. La fonction de maintien au chaud se déclenche par un appui long de 2 s sur la touche ° ; elle conserve la température pendant 30 min puis s'éteint d’elle-même.
+
+Consignes de sécurité. Lisez-les avant tout usage et conservez cette notice.
+
+N'immergez jamais la bouilloire, le socle ou le cordon dans l’eau. En cas de projection accidentelle, débranchez immédiatement et laissez sécher 24 h avant tout nouvel usage. Vérifiez régulièrement l’état du cordon : s'il est endommagé, il doit être remplacé par le fabricant, son service après-vente ou une personne de qualification équivalente, afin d’écarter tout danger.
+
+Ne faites jamais chauffer autre chose que de l'eau : ni lait, ni bouillon, ni sachet de soupe. Ces liquides attachent à la résistance, débordent en moussant et rendent l'appareil irrécupérable. De même, ne réchauffez rien au micro-ondes dans le corps de la bouilloire, dont l'habillage comporte des pièces métalliques.
+
+N’ouvrez pas le couvercle pendant le chauffage. L’eau bouillante peut jaillir. Après l'arrêt, attendez 30 s avant d’ouvrir, et tenez le visage à l’écart. Portez toujours l’appareil par sa poignée, jamais par le corps, qui atteint 90 °C en surface.
+
+Garantie
+
+Cet appareil est garanti 24 mois à compter de la date d’achat figurant sur le ticket de caisse ou la facture, qu'il convient de conserver. La garantie couvre le remplacement ou la réparation des pièces reconnues défectueuses, ainsi que la main-d'œuvre correspondante.
+
+Sont exclus de la garantie : les dommages résultant d’une utilisation non conforme à la présente notice, les détériorations dues au calcaire ou à un défaut d'entretien, les chocs, chutes et rayures, l'usure normale du joint et du filtre, ainsi que toute intervention effectuée par un tiers non agréé. L’ouverture du socle entraîne la perte immédiate du bénéfice de la garantie.
+
+Cette garantie commerciale s'applique sans préjudice de la garantie légale de conformité et de la garantie relative aux défauts cachés, dont vous bénéficiez de plein droit. Les pièces détachées essentielles resteront disponibles pendant 7 ans après la fin de la commercialisation du modèle.
+
+Fin de vie du produit. Ne jetez pas cet appareil avec les ordures ménagères. Il contient des composants électroniques et des métaux qui doivent être récupérés. Déposez-le en déchetterie ou dans le point de collecte du magasin, qui a l’obligation de le reprendre lors de l'achat d'un appareil équivalent. Le carton d'emballage et la notice sont recyclables ; le film de protection ne l’est pas et doit être jeté séparément.
