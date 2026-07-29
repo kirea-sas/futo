@@ -1,14 +1,13 @@
 # Travailler sur un Mac
 
-> **Ce qui a été mesuré, et ce qui ne l'est pas.** Le dépôt a été écrit sur un
-> processeur Linux sans GPU. Un premier run sur **Apple M2 Max** a depuis fourni
-> de vraies mesures pour `futo-tiny` — reportées plus bas et signalées comme
-> telles. Les durées de `futo-mac` et `futo-small`, elles, restent **calculées**
-> à partir de FLOPs crête Apple approximatifs : Apple ne publie pas de chiffre
-> comparable à celui d'NVIDIA.
+> **Ce document repose sur des mesures.** Le dépôt a été écrit sur un processeur
+> Linux sans GPU, mais `futo-tiny` et `futo-mac` ont depuis été chronométrés sur
+> un **Apple M2 Max** ; les chiffres correspondants sont signalés comme mesurés.
+> Ce qui en est extrapolé — `futo-small`, `futo-base`, les autres puces — reste
+> un calcul, et est signalé comme tel.
 >
-> Pour obtenir le vrai chiffre sur VOTRE machine sans engager des jours de
-> calcul, c'est `futo bench` — voir ci-dessous.
+> Pour le chiffre exact sur VOTRE machine, sans engager des jours de calcul :
+> `futo bench`.
 
 Futo détecte le GPU intégré (MPS) tout seul, sans réglage. Avant toute chose,
 mesurez :
@@ -31,30 +30,38 @@ futo train configs/futo-mac.yaml
 
 ## Ce qui a été mesuré sur Apple M2 Max
 
-Premier run réel, `futo-tiny` (1,3 M de paramètres, contexte 256, lots de
-2 048 tokens), en **float32** — c'est ce que fixe la configuration `tiny` :
+**`futo-mac`, la configuration qui compte** — 39,3 M de paramètres, contexte
+1 024, lots de 8 192 tokens, en **bfloat16** :
 
-| Mesure | Apple M2 Max (MPS) | 4 cœurs Linux, pour comparaison |
+| Mesure | Valeur |
+|---|---|
+| Débit | **9 068 tokens/s** |
+| MFU | **19,1 %** |
+| Un pas d'optimisation (131 072 tokens) | 14,45 s |
+| **Entraînement complet (1,49 G tokens)** | **45,8 h, soit 1,9 jour** |
+| Puissance effective | 2,63 TFLOPS |
+
+Deux enseignements. D'abord, **l'autocast bfloat16 fonctionne sur MPS** : la
+sonde de démarrage passe, aucun repli sur float32 n'a lieu. Ensuite, les 15 % de
+MFU que ce document supposait étaient **conservateurs** — le réel est 19,1 %,
+et l'entraînement prend 1,9 jour au lieu des 2,4 annoncés. C'est le bon sens de
+l'erreur, mais c'était bien une supposition : d'où la commande `futo bench`.
+
+**`futo-tiny`, pour comparaison** — 1,3 M de paramètres, contexte 256, lots de
+2 048 tokens, en float32 :
+
+| Mesure | Apple M2 Max (MPS) | 4 cœurs Linux |
 |---|---|---|
 | Débit en régime | 57 000 à 60 000 tokens/s | 11 000 à 19 000 tokens/s |
 | 400 pas | 15,6 s | 45 à 77 s |
 | MFU affiché | 4,0 à 4,2 % | — |
-| Suite de tests | 14 s | 17 s |
+| Suite de tests | 14 s | 18 s |
 
-Soit un facteur **3 à 5** par rapport à quatre cœurs de processeur, sur un
-modèle qui est pourtant le pire cas possible pour un GPU.
-
-Deux précautions sur le MFU de 4 %, avant d'en tirer des conclusions :
-
-- **`futo-tiny` est pathologiquement petit.** Avec `d_model` à 128 et des lots de
-  2 048 tokens, le temps est dominé par le lancement des noyaux, pas par le
-  calcul. Un MFU faible est attendu et ne dit rien de `futo-mac`, dont les lots
-  sont soixante-quatre fois plus gros.
-- **Le run était en float32, le MFU est rapporté à une crête bf16.** À
-  précision égale, le chiffre serait à peu près doublé.
-
-Autrement dit : ces 4 % ne confirment ni n'infirment les 15 % supposés pour
-`futo-mac`. Seul un `futo bench configs/futo-mac.yaml` tranchera.
+Le débit brut en tokens/s est six fois plus élevé que sur `futo-mac`, et
+pourtant le MFU est cinq fois plus bas : à cette taille, le temps passe dans le
+lancement des noyaux, pas dans le calcul. C'est pourquoi un modèle jouet ne dit
+jamais rien du débit d'un vrai modèle — et pourquoi `futo bench` mesure la
+configuration exacte que vous comptez entraîner, pas une approximation.
 
 ---
 
@@ -89,10 +96,13 @@ localement, et seul le run final part sur une machine louée.
 
 ## Ce qu'un Mac ne fera pas
 
-Le run complet de `futo-small` : 7,1 EFLOP. Même sur un M3 Ultra à 15 % de MFU,
-cela dépasse trois semaines sans interruption. Ce n'est pas raisonnable —
-une nuit de mise en veille, une mise à jour système, et c'est perdu. À
-comparer aux 5 heures et 20-40 € d'un H100.
+Le run complet de `futo-small` : 7,1 EFLOP, soit **31 jours** sur un M2 Max à
+l'efficacité mesurée, une quinzaine sur un M3 Ultra. Ce n'est pas raisonnable —
+une nuit de mise en veille, une mise à jour système, et c'est perdu. À comparer
+aux 5 heures et 20-40 € d'un H100. Et `futo-base` demanderait près d'un an.
+
+En revanche `futo-mac` en 1,9 jour est parfaitement tenable, et c'est bien pour
+cela que cette configuration existe.
 
 La division du travail qui a du sens :
 
@@ -104,18 +114,19 @@ La division du travail qui a du sens :
 | `futo-small`, `futo-base` | GPU loué | 20-40 € et 150-250 € respectivement |
 | Évaluation, génération, inspection | Mac | quelques secondes, sur le checkpoint rapatrié |
 
-## Les tailles et leurs durées calculées
+## Les tailles et leurs durées
 
-Durées à 15 % de MFU, valeur supposée pour MPS et **non vérifiée** : la seule
-mesure dont on dispose porte sur `futo-tiny`, qui n'est pas représentatif.
-Lancez `futo bench` sur la configuration qui vous intéresse plutôt que de vous
-fier à ce tableau.
+La ligne `futo-mac` sur M2 Max est **mesurée**. Le reste en est extrapolé, à
+efficacité égale (19,1 % de MFU) et au prorata des FLOPs crête — donc à prendre
+comme un ordre de grandeur. Lancez `futo bench` sur la configuration qui vous
+intéresse pour obtenir votre propre chiffre.
 
 | Configuration | Paramètres | Calcul | M2 Max | M3 Max | M3 Ultra |
 |---|---|---|---|---|---|
 | `futo-tiny` | 1,3 M | — | instantané | instantané | instantané |
-| `futo-mac` | 39,3 M | 0,43 EFLOP | 2,4 j | 2,4 j | 1,2 j |
-| `futo-small` | 100,7 M | 7,1 EFLOP | 40 j | 39 j | 20 j |
+| `futo-mac` | 39,3 M | 0,43 EFLOP | **1,9 j (mesuré)** | ~1,8 j | ~0,9 j |
+| `futo-small` | 100,7 M | 7,1 EFLOP | ~31 j | ~31 j | ~15 j |
+| `futo-base` | 299,4 M | 72 EFLOP | ~317 j | — | — |
 
 La mémoire n'est pas le facteur limitant. `futo-mac` demande 600 Mio pour les
 poids, les gradients et les moments d'Adam ; `futo-small`, 1,5 Gio. Même en
@@ -128,7 +139,8 @@ la *vitesse* qui tranche, pas la mémoire.
 l'autocast sur MPS dépend de la version de PyTorch et du type demandé. Futo
 teste la combinaison sur un tenseur minuscule au démarrage : si elle ne passe
 pas, il retombe en float32 **en le disant**. Un repli silencieux se paierait en
-heures de calcul inexpliquées.
+heures de calcul inexpliquées. Constaté sur M2 Max avec PyTorch 2.13 : le
+**bfloat16 passe**, la sonde ne déclenche aucun repli.
 
 **`torch.compile` : laissez-le désactivé.** Sur MPS il est au mieux inutile, au
 pire une source d'erreurs obscures. Le défaut de toutes les configurations est

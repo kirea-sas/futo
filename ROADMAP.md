@@ -86,10 +86,10 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
       près, impossible sur MPS où l'ordre des réductions varie ; (3) les tests de
       documentation ratissaient les fichiers Markdown de .venv (239 tests au lieu
       de 188)
-- [ ] Le débit de `futo-mac` sur Mac reste NON MESURÉ. Les 4 % de MFU relevés
-      sur `futo-tiny` ne sont pas représentatifs : modèle minuscule, lots 64 fois
-      plus petits, et fp32 comparé à une crête bf16. Lancer
-      `futo bench configs/futo-mac.yaml` et remplacer les estimations
+- [x] ~~Le débit de `futo-mac` sur Mac reste NON MESURÉ~~ — mesuré le 29/07 sur
+      Apple M2 Max : 9 068 tokens/s, 19,1 % de MFU, 45,8 h pour le run complet.
+      L'hypothèse de 15 % de MFU était conservatrice ; `futo info` est recalé
+      sur 18 %, avec une marge
 - [ ] Le MFU est rapporté à une crête bf16 quelle que soit la précision réelle :
       un run fp32 affiche donc un MFU environ deux fois trop bas
 
@@ -107,9 +107,18 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 | Débit `futo-tiny` | 57 000-60 000 tokens/s | **Apple M2 Max**, MPS, fp32 |
 | Entraînement `futo-tiny` | 400 pas en 15,6 s | **Apple M2 Max**, MPS, fp32 |
 | MFU `futo-tiny` | 4,0-4,2 % | M2 Max, fp32 contre crête bf16 — non représentatif |
+| **Débit `futo-mac`** | **9 068 tokens/s** | **Apple M2 Max, MPS, bf16** |
+| **MFU `futo-mac`** | **19,1 %** | idem — 2,63 TFLOPS effectifs |
+| **Run complet `futo-mac`** | **45,8 h (1,9 j)** | idem, 1,49 G tokens |
+| bfloat16 sur MPS | fonctionne | M2 Max, PyTorch 2.13 — aucun repli déclenché |
 | Entraînement `futo-tiny` | 400 pas, 45-77 s, perte 8,3 → 4,17 | 4 cœurs, fp32 (deux mesures) |
 | Débit `futo-tiny` | 11 000-19 000 tokens/s | 4 cœurs, fp32 |
 
-Les chiffres qui manquent — et qui comptent — sont ceux d'un vrai entraînement
-sur GPU : MFU réel, bits par octet sur du français tenu à l'écart, score aux
-sondes grammaticales. Ils viendront avec `futo-small`.
+Les chiffres qui manquent — et qui comptent — sont désormais ceux d'un vrai
+entraînement de bout en bout : bits par octet sur du français tenu à l'écart,
+score aux sondes grammaticales, fertilité du tokenizer sur un corpus réel. Le
+débit, lui, est mesuré ; ce qui reste à prouver, c'est que le modèle apprend
+quelque chose.
+
+Aucun MFU n'a encore été relevé sur GPU NVIDIA : les durées et les coûts de
+`futo-small`, `futo-base` et `futo-large` restent calculés.

@@ -67,7 +67,7 @@ affaire d'échelle.
 | Configuration | Paramètres | Couches | d_model | Contexte | Budget visé | Calcul | Où l'entraîner |
 |---|---|---|---|---|---|---|---|
 | `futo-tiny`  | 1,3 M     | 4  | 128  | 256   | —          | —          | un processeur, 45 s |
-| `futo-mac`   | 39,3 M    | 8  | 512  | 1 024 | 1,5 G tokens| 0,43 EFLOP | un Mac, ~2,5 j (voir [docs/MAC.md](docs/MAC.md)) |
+| `futo-mac`   | 39,3 M    | 8  | 512  | 1 024 | 1,5 G tokens| 0,43 EFLOP | un Mac, **1,9 j mesuré** sur M2 Max ([docs/MAC.md](docs/MAC.md)) |
 | `futo-small` | 100,7 M   | 12 | 768  | 1 024 | 10 G tokens| 7,1 EFLOP  | 1 GPU, ~5 h sur H100, 20-40 € |
 | `futo-base`  | 299,4 M   | 24 | 1 024| 2 048 | 30 G tokens| 72 EFLOP   | 1 GPU, ~50 h sur H100, 150-250 € |
 | `futo-large` | 1 180,8 M | 24 | 2 048| 2 048 | 100 G tokens| 829 EFLOP | 8 GPU, ~3 j, 1 500-2 500 € |
@@ -92,9 +92,10 @@ futo bench configs/futo-small.yaml
 ```
 
 Sur un Mac Apple Silicon, le GPU intégré est détecté et utilisé sans réglage.
-Un Mac ne mènera pas le run complet de `futo-small` (plus d'un mois), mais il
-est le bon outil pour tout ce qui vient avant : entraîner le tokenizer,
-préparer les shards, et comparer des mélanges de corpus avec `futo-mac`.
+Un Mac ne mènera pas le run complet de `futo-small` — 31 jours sur un M2 Max, à
+l'efficacité mesurée — mais il est le bon outil pour tout ce qui vient avant :
+entraîner le tokenizer, préparer les shards, et comparer des mélanges de corpus
+avec `futo-mac`, dont les 1,9 jour tiennent en deux nuits.
 Voir [docs/MAC.md](docs/MAC.md).
 
 Le budget de tokens visé est d'environ 100 tokens par paramètre, soit cinq fois

@@ -1,10 +1,13 @@
 # futo-mac — 39 M de paramètres, taillé pour un Mac Apple Silicon.
 #
+# MESURÉ sur Apple M2 Max, en bfloat16 : 9 068 tokens/s, 19,1 % de MFU,
+# 14,45 s par pas, soit 45,8 h — 1,9 jour — pour l'entraînement complet.
+#
 # Pourquoi une taille intermédiaire plutôt que futo-small : un Mac ne peut pas
-# mener le run complet de futo-small. 7,1 EFLOP à ~2 TFLOPS effectifs sur un
-# M3 Max, cela ferait plus d'un mois sans interruption. À 39 M de paramètres et
+# mener le run complet de futo-small. À la même efficacité mesurée, ses
+# 7,1 EFLOP demanderaient 31 jours sans interruption. À 39 M de paramètres et
 # 1,5 G de tokens (soit 38 tokens par paramètre, au-dessus du ratio de
-# Chinchilla), le budget tombe à ~0,35 EFLOP — deux à trois jours.
+# Chinchilla), le budget tombe à 0,43 EFLOP, et deux nuits suffisent.
 #
 # Ce que ce modèle vaut : pas grand-chose en absolu, mais il permet de COMPARER.
 # Deux mélanges de corpus, deux tailles de vocabulaire, deux réglages : à cette
@@ -15,9 +18,8 @@
 # La mémoire n'est pas le facteur limitant : 39 M × 16 octets = 630 Mo pour les
 # poids, les gradients et les moments d'Adam. Cela passe sur un Mac de 16 Go.
 #
-# ATTENTION : les durées ci-dessus sont CALCULÉES, jamais mesurées — aucun Mac
-# n'a servi à écrire ce dépôt. Le premier run donnera le vrai débit en tokens/s
-# affiché par la boucle ; c'est ce chiffre qu'il faudra reporter ici.
+# Sur une autre machine, mesurez la vôtre plutôt que d'extrapoler celle-ci :
+#     futo bench configs/futo-mac.yaml
 hérite: commun.yaml
 nom: futo-mac
 

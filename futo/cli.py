@@ -92,7 +92,10 @@ def cmd_info(args) -> int:
     peripherique = choisir_peripherique()
     local = nom_du_materiel(peripherique)
     crete_locale = flops_crete_du_materiel(local)
-    mfu_local = 0.40 if peripherique.type == "cuda" else 0.15
+    # 18 % pour Apple : mesuré à 19,1 % sur un M2 Max avec futo-mac en bf16,
+    # on garde une marge. C'est UNE mesure sur UNE configuration — d'où
+    # « futo bench », qui mesure la vôtre au lieu de l'extrapoler.
+    mfu_local = 0.40 if peripherique.type == "cuda" else 0.18
     print(f"Votre machine : {local} ({peripherique.type})")
     if crete_locale > 0:
         print(
@@ -114,15 +117,15 @@ def cmd_info(args) -> int:
     for nom in nvidia:
         print(f"  {nom:<9} {duree(flops_total / (FLOPS_CRETE[nom] * 0.40) / 3600):>9}")
     print()
-    print("À 15 % de MFU (Apple Silicon, ordre de grandeur — voir docs/MAC.md) :")
+    print("À 18 % de MFU (Apple Silicon, mesuré sur M2 Max — voir docs/MAC.md) :")
     for nom in apple:
-        print(f"  {nom:<9} {duree(flops_total / (FLOPS_CRETE[nom] * 0.15) / 3600):>9}")
+        print(f"  {nom:<9} {duree(flops_total / (FLOPS_CRETE[nom] * 0.18) / 3600):>9}")
     print()
     print("  Ces durées sont CALCULÉES, pas mesurées. 40 % de MFU est atteignable")
     print("  mais optimiste : sous 200 M de paramètres, le surcoût des noyaux et")
-    print("  du chargement fait souvent tomber le MFU à 20-30 % sur GPU, et le")
-    print("  chiffre Apple est un ordre de grandeur. Comptez 1,5 à 2 fois plus")
-    print("  pour être prudent, et ajoutez le prix horaire pour obtenir un coût.")
+    print("  du chargement fait souvent tomber le MFU à 20-30 % sur GPU. Le")
+    print("  chiffre Apple s'appuie sur une seule mesure (M2 Max, futo-mac, bf16).")
+    print("  Pour un chiffre MESURÉ sur cette machine : futo bench <config>")
     return 0
 
 
