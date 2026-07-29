@@ -38,6 +38,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 __all__ = [
+    "URL_DUMP_FR",
+    "telecharger_dump",
     "nettoyer_wikitexte",
     "lire_dump",
     "convertir_dump",
@@ -256,6 +258,113 @@ def nettoyer_wikitexte(brut: str) -> str:
     texte = "\n".join(lignes)
     texte = _MOTIF_LIGNES_VIDES.sub("\n\n", texte)
     return texte.strip()
+
+
+# --------------------------------------------------------------------------- #
+# Téléchargement
+# --------------------------------------------------------------------------- #
+
+# L'adresse officielle des dumps francophones. « latest » suit toujours la
+# dernière version publiée — pratique, mais cela veut dire que deux
+# téléchargements à quelques semaines d'écart ne donnent pas le même corpus.
+# D'où la trace écrite dans data/SOURCES.md : sans elle, impossible de dire
+# plus tard sur quoi un modèle a été entraîné.
+URL_DUMP_FR = (
+    "https://dumps.wikimedia.org/frwiki/latest/"
+    "frwiki-latest-pages-articles.xml.bz2"
+)
+
+
+def telecharger_dump(
+    url: str = URL_DUMP_FR,
+    destination: str | Path = "data/brut/frwiki-latest-pages-articles.xml.bz2",
+    journal=None,
+) -> Path:
+    """Récupère un dump, avec reprise si le téléchargement a été interrompu.
+
+    Plusieurs gigaoctets sur une liaison domestique, c'est long, et une coupure
+    en cours de route est la règle plutôt que l'exception. Le fichier est donc
+    écrit sous un nom temporaire, et une reprise repart de l'octet où l'on
+    s'était arrêté grâce à l'en-tête HTTP `Range`. Un dump déjà complet n'est
+    pas retéléchargé.
+    """
+    import urllib.error
+    import urllib.request
+
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partiel = destination.with_suffix(destination.suffix + ".partiel")
+
+    def dire(message: str) -> None:
+        if journal is not None:
+            journal(message)
+
+    if destination.exists():
+        dire(f"  déjà présent : {destination} "
+             f"({destination.stat().st_size / 2**30:.2f} Gio) — rien à faire.")
+        return destination
+
+    deja = partiel.stat().st_size if partiel.exists() else 0
+    requete = urllib.request.Request(url, headers={"User-Agent": "futo/0.1"})
+    if deja:
+        dire(f"  reprise à {deja / 2**30:.2f} Gio")
+        requete.add_header("Range", f"bytes={deja}-")
+
+    try:
+        reponse = urllib.request.urlopen(requete, timeout=60)
+    except urllib.error.HTTPError as e:
+        if e.code == 416 and deja:  # déjà tout téléchargé
+            partiel.replace(destination)
+            return destination
+        raise ValueError(
+            f"Téléchargement impossible ({e.code} {e.reason}) depuis {url}.\n"
+            f"Vérifiez l'adresse sur https://dumps.wikimedia.org/frwiki/"
+        ) from None
+    except OSError as e:
+        raise ValueError(
+            f"Téléchargement impossible depuis {url} : {e}.\n"
+            f"Réseau coupé, ou serveur injoignable. Relancez : la reprise "
+            f"repartira d'où elle s'est arrêtée."
+        ) from None
+
+    # Le serveur peut ignorer la demande de reprise : on repart alors de zéro.
+    reprise_acceptee = getattr(reponse, "status", 200) == 206
+    if deja and not reprise_acceptee:
+        dire("  le serveur refuse la reprise, téléchargement complet.")
+        deja = 0
+
+    longueur = reponse.headers.get("Content-Length")
+    total = (int(longueur) + deja) if longueur else None
+    if total:
+        dire(f"  {total / 2**30:.2f} Gio à récupérer")
+
+    mode = "ab" if deja else "wb"
+    recu = deja
+    dernier_affichage = deja
+    with reponse, partiel.open(mode) as fh:
+        while True:
+            morceau = reponse.read(1 << 20)  # 1 Mio
+            if not morceau:
+                break
+            fh.write(morceau)
+            recu += len(morceau)
+            if recu - dernier_affichage >= 100 * 2**20:  # tous les 100 Mio
+                dernier_affichage = recu
+                if total:
+                    dire(f"  {recu / 2**30:.2f} / {total / 2**30:.2f} Gio "
+                         f"({recu * 100 / total:.0f} %)")
+                else:
+                    dire(f"  {recu / 2**30:.2f} Gio")
+
+    if total and recu < total:
+        raise ValueError(
+            f"Téléchargement incomplet : {recu} octets sur {total} attendus. "
+            f"Le fichier partiel est conservé, relancez pour reprendre."
+        )
+
+    partiel.replace(destination)
+    dire(f"  terminé : {destination} ({recu / 2**30:.2f} Gio)")
+    return destination
 
 
 # --------------------------------------------------------------------------- #

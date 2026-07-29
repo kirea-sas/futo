@@ -276,10 +276,31 @@ def cmd_data_info(args) -> int:
 
 
 def cmd_data_wikipedia(args) -> int:
-    """Convertit un dump Wikipédia en corpus JSONL."""
-    from .wikipedia import consigner_source, convertir_dump
+    """Télécharge si besoin, puis convertit un dump Wikipédia en corpus JSONL."""
+    from .wikipedia import URL_DUMP_FR, consigner_source, convertir_dump, telecharger_dump
 
-    dump = Path(args.dump)
+    if args.dump:
+        dump = Path(args.dump)
+        if not dump.exists():
+            raise FileNotFoundError(
+                f"Dump introuvable : {dump}\n"
+                f"Pour le récupérer automatiquement : futo data wikipedia --telecharger"
+            )
+    elif args.telecharger:
+        print(f"Téléchargement depuis {args.url or URL_DUMP_FR}")
+        print("  Environ 7 Gio. Une interruption n'est pas grave : relancer la")
+        print("  commande reprend là où elle s'est arrêtée.")
+        dump = telecharger_dump(args.url or URL_DUMP_FR, args.vers, journal=print)
+        print()
+    else:
+        print("Aucun dump indiqué.\n")
+        print("Si vous avez déjà le fichier :")
+        print("  futo data wikipedia frwiki-latest-pages-articles.xml.bz2\n")
+        print("Sinon, pour le télécharger et le convertir dans la foulée :")
+        print("  futo data wikipedia --telecharger\n")
+        print(f"Source : {URL_DUMP_FR}")
+        return 1
+
     print(f"Conversion de {dump.name} "
           f"({dump.stat().st_size / 2**30:.1f} Gio compressés)")
     print("  Cela peut prendre de longues minutes sur un dump complet.")
@@ -583,7 +604,13 @@ Chaque commande accepte --set pour surcharger la configuration :
     p = sous_data.add_parser(
         "wikipedia", help="convertit un dump Wikipédia en corpus JSONL"
     )
-    p.add_argument("dump", help="fichier frwiki-…-pages-articles.xml.bz2")
+    p.add_argument("dump", nargs="?",
+                   help="fichier frwiki-…-pages-articles.xml.bz2 déjà téléchargé")
+    p.add_argument("--telecharger", action="store_true",
+                   help="récupère le dump officiel (~7 Gio, reprise si coupure)")
+    p.add_argument("--url", default=None, help="adresse du dump (défaut : Wikipédia FR)")
+    p.add_argument("--vers", default="data/brut/frwiki-latest-pages-articles.xml.bz2",
+                   help="où enregistrer le dump téléchargé")
     p.add_argument("--sortie", default="data/brut/wikipedia-fr.jsonl")
     p.add_argument("--articles-max", type=int, default=None,
                    help="s'arrête après N articles (pour essayer sans tout traiter)")
@@ -595,7 +622,7 @@ Chaque commande accepte --set pour surcharger la configuration :
     p.add_argument("--sans-journal-des-sources", action="store_true",
                    help="n'écrit pas dans data/SOURCES.md (déconseillé)")
     p.add_argument("--silencieux", action="store_true")
-    p.set_defaults(fonction=cmd_data_wikipedia)
+    p.set_defaults(fonction=cmd_data_wikipedia, url=None)
 
     p = sous_data.add_parser("telecharger", help="marche à suivre pour un vrai corpus français")
     p.set_defaults(fonction=cmd_data_telecharger)

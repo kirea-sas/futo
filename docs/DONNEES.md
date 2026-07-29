@@ -56,8 +56,18 @@ seule source pour laquelle Futo fournit l'outillage complet :
 futo data wikipedia frwiki-latest-pages-articles.xml.bz2
 ```
 
-Le dump se récupère sur `dumps.wikimedia.org`, dans le fichier
-`frwiki-latest-pages-articles.xml.bz2` (plusieurs gigaoctets). La commande le
+Si le dump n'est pas déjà sur le disque, la commande le télécharge elle-même :
+
+```bash
+futo data wikipedia --telecharger
+```
+
+Environ 7 Gio, plus d'une heure sur une liaison domestique. Une coupure n'est
+pas grave : relancer la commande reprend à l'octet près, grâce à l'en-tête HTTP
+`Range`, et un fichier déjà complet n'est jamais retéléchargé.
+
+Le dump se récupère sinon à la main sur `dumps.wikimedia.org`, dans le fichier
+`frwiki-latest-pages-articles.xml.bz2`. La commande le
 lit en flux — jamais en mémoire —, nettoie le wikitexte (modèles imbriqués,
 tableaux, liens, références, catégories, sections de fin), écrit le JSONL
 attendu par `futo data preparer`, et consigne la source dans `data/SOURCES.md`.

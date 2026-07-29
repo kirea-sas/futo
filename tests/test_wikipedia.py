@@ -12,7 +12,9 @@ d'un vrai dump de plusieurs gigaoctets. Les surprises viendront de là.
 from __future__ import annotations
 
 import bz2
+import http.server
 import json
+import threading
 from xml.sax.saxutils import escape
 
 import pytest
@@ -22,6 +24,7 @@ from futo.wikipedia import (
     convertir_dump,
     lire_dump,
     nettoyer_wikitexte,
+    telecharger_dump,
 )
 
 # --------------------------------------------------------------------------- #
@@ -382,3 +385,106 @@ def test_la_source_est_consignee(tmp_path):
     contenu = sources.read_text(encoding="utf-8")
     assert contenu.count("| Date | Source |") == 1
     assert "CC0" in contenu
+
+
+# --------------------------------------------------------------------------- #
+# Téléchargement
+# --------------------------------------------------------------------------- #
+
+
+class _ServeurAvecRange(http.server.BaseHTTPRequestHandler):
+    """Serveur minimal qui gère l'en-tête Range, pour éprouver la reprise.
+
+    `SimpleHTTPRequestHandler` ne le gère pas : sans cela, on ne testerait que
+    le cas facile, celui où rien ne se coupe.
+    """
+
+    contenu = b""
+
+    def do_GET(self):  # noqa: N802 (nom imposé par la bibliothèque standard)
+        debut = 0
+        plage = self.headers.get("Range")
+        if plage and plage.startswith("bytes="):
+            debut = int(plage.removeprefix("bytes=").split("-")[0])
+        if debut >= len(self.contenu):
+            self.send_error(416)
+            return
+        morceau = self.contenu[debut:]
+        self.send_response(206 if debut else 200)
+        self.send_header("Content-Length", str(len(morceau)))
+        if debut:
+            self.send_header(
+                "Content-Range",
+                f"bytes {debut}-{len(self.contenu) - 1}/{len(self.contenu)}",
+            )
+        self.end_headers()
+        self.wfile.write(morceau)
+
+    def log_message(self, *args):
+        pass  # silence pendant les tests
+
+
+@pytest.fixture
+def serveur(monkeypatch):
+    """Sert un contenu fixe sur localhost, le temps d'un test."""
+    monkeypatch.setenv("no_proxy", "localhost,127.0.0.1")
+    monkeypatch.setenv("NO_PROXY", "localhost,127.0.0.1")
+    _ServeurAvecRange.contenu = bz2.compress(b"contenu de dump " * 5_000)
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _ServeurAvecRange)
+    fil = threading.Thread(target=httpd.serve_forever, daemon=True)
+    fil.start()
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/dump.bz2"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_telechargement_complet(serveur, tmp_path):
+    cible = tmp_path / "dump.xml.bz2"
+    resultat = telecharger_dump(serveur, cible, journal=None)
+    assert resultat == cible
+    assert cible.read_bytes() == _ServeurAvecRange.contenu
+    # Aucun fichier partiel ne doit subsister après un téléchargement réussi.
+    assert not list(tmp_path.glob("*.partiel"))
+
+
+def test_reprise_apres_coupure(serveur, tmp_path):
+    """Le cas qui compte : 7 Gio sur une liaison domestique, ça coupe.
+
+    On simule une coupure en écrivant à la main un fichier partiel, puis on
+    vérifie que la reprise complète le fichier au lieu de tout recommencer.
+    """
+    cible = tmp_path / "dump.xml.bz2"
+    partiel = cible.with_suffix(cible.suffix + ".partiel")
+    coupure = len(_ServeurAvecRange.contenu) // 3
+    partiel.write_bytes(_ServeurAvecRange.contenu[:coupure])
+
+    telecharger_dump(serveur, cible, journal=None)
+    assert cible.read_bytes() == _ServeurAvecRange.contenu
+
+
+def test_fichier_deja_complet_nest_pas_retelecharge(serveur, tmp_path):
+    """Relancer la commande ne doit pas refaire une heure de téléchargement."""
+    cible = tmp_path / "dump.xml.bz2"
+    cible.write_bytes(b"deja la")
+    telecharger_dump(serveur, cible, journal=None)
+    assert cible.read_bytes() == b"deja la"  # intact, non réécrit
+
+
+def test_adresse_invalide_leve_une_erreur_actionnable(tmp_path, monkeypatch):
+    monkeypatch.setenv("no_proxy", "localhost,127.0.0.1")
+    monkeypatch.setenv("NO_PROXY", "localhost,127.0.0.1")
+    with pytest.raises(ValueError, match="Téléchargement impossible"):
+        telecharger_dump("http://127.0.0.1:1/absent.bz2", tmp_path / "d.bz2", journal=None)
+
+
+def test_le_dump_telecharge_est_lisible(serveur, tmp_path):
+    """Chaîne complète : télécharger, puis convertir, sans intervention."""
+    _ServeurAvecRange.contenu = bz2.compress(
+        _GABARIT.format(pages=_page("Chat", LONG)).encode("utf-8")
+    )
+    cible = tmp_path / "dump.xml.bz2"
+    telecharger_dump(serveur, cible, journal=None)
+    resultat = convertir_dump(cible, tmp_path / "corpus.jsonl", journal=None)
+    assert resultat.n_articles == 1

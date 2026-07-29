@@ -17,7 +17,7 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 - [x] Prise en charge du Mac (MPS) : détection de la puce, précision mixte
       essayée puis repli annoncé, configuration `futo-mac` — voir docs/MAC.md
 - [x] Corpus d'exemple original de 142 Ko, licence propre, pour les tests hors ligne
-- [x] 235 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
+- [x] 240 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
       et le démarrage du README rejoué depuis un clone neuf dans un
       environnement virtuel vierge, jusqu'à la génération de texte,
       dont des tests de la DOCUMENTATION : les blocs de commandes doivent
@@ -29,6 +29,9 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 
 C'est **le** sujet. Le reste est de la plomberie déjà écrite.
 
+- [x] **Téléchargement du dump intégré** : `futo data wikipedia --telecharger`
+      récupère les ~7 Gio, avec reprise à l'octet près après une coupure et
+      aucun retéléchargement d'un fichier complet
 - [x] **Ingestion de Wikipédia** : `futo data wikipedia <dump>` nettoie le
       wikitexte (modèles imbriqués, tableaux, liens, références, catégories),
       écrit le JSONL attendu et consigne la source. Lecture en flux, jamais en
@@ -116,7 +119,7 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 | Fertilité du tokenizer | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
 | Mots rendus en un seul token | 62,6 % | idem |
 | Aller-retour tokenizer | exact | accents, ligatures, guillemets, émojis, code |
-| Suite de tests | 235 tests, 17 s | 4 cœurs, hors ligne |
+| Suite de tests | 240 tests, 17 s | 4 cœurs, hors ligne |
 | Suite de tests | 14 s (190 tests à la date de la mesure) | Apple M2 Max |
 | Débit `futo-tiny` | 57 000-60 000 tokens/s | **Apple M2 Max**, MPS, fp32 |
 | Entraînement `futo-tiny` | 400 pas en 15,6 s | **Apple M2 Max**, MPS, fp32 |

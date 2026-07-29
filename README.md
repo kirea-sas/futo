@@ -252,7 +252,7 @@ futo/
 configs/         les quatre tailles, plus les réglages communs
 data/echantillon/  142 Ko de français original, pour les tests hors ligne
 data/sondes/     les 72 paires minimales françaises
-tests/           235 tests, 17 s sur processeur, sans réseau
+tests/           240 tests, 17 s sur processeur, sans réseau
 docs/            architecture, données, carte du modèle, Mac
 ```
 
@@ -264,7 +264,7 @@ docs/            architecture, données, carte du modèle, Mac
 pytest
 ```
 
-235 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
+240 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
 ne vérifient pas des formes de tenseurs mais des propriétés qu'un modèle peut
 violer en silence :
 
