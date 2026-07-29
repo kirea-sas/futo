@@ -24,6 +24,11 @@ plus que le calcul.
 
 ```bash
 git clone https://github.com/kirea-sas/futo && cd futo
+
+# Un environnement isole. Obligatoire avec Homebrew et plusieurs distributions
+# Linux, qui refusent desormais toute installation dans le Python du systeme
+# (PEP 668). Cela evite aussi de melanger les versions de PyTorch.
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 # 1. Un tokenizer francais, entraine sur le corpus fourni dans le depot
@@ -41,8 +46,14 @@ futo eval sorties/tiny/meilleur.pt
 futo generer sorties/tiny/dernier.pt --amorce "Le vieux moulin" --max-tokens 60
 ```
 
-Aucune de ces commandes ne touche au réseau. Sur quatre cœurs, l'entraînement
-prend 45 secondes.
+Il faut **Python 3.10 ou plus récent** (`python3 --version`). Sur macOS, la
+commande s'appelle `python3`, jamais `python`, et `pip` n'existe qu'une fois
+l'environnement activé — c'est la raison du `source .venv/bin/activate`
+ci-dessus. Pensez à le réactiver à chaque nouveau terminal.
+
+Passé l'installation, aucune de ces commandes ne touche au réseau.
+L'entraînement prend 45 à 80 secondes sur quatre cœurs, selon la charge de la
+machine.
 
 Le texte produit sera du charabia — 1,3 million de paramètres entraînés sur
 37 000 tokens, on n'attend rien d'autre. Ce que ces quatre commandes prouvent,
