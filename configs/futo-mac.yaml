@@ -1,0 +1,49 @@
+# futo-mac — 39 M de paramètres, taillé pour un Mac Apple Silicon.
+#
+# Pourquoi une taille intermédiaire plutôt que futo-small : un Mac ne peut pas
+# mener le run complet de futo-small. 7,1 EFLOP à ~2 TFLOPS effectifs sur un
+# M3 Max, cela ferait plus d'un mois sans interruption. À 39 M de paramètres et
+# 1,5 G de tokens (soit 38 tokens par paramètre, au-dessus du ratio de
+# Chinchilla), le budget tombe à ~0,35 EFLOP — deux à trois jours.
+#
+# Ce que ce modèle vaut : pas grand-chose en absolu, mais il permet de COMPARER.
+# Deux mélanges de corpus, deux tailles de vocabulaire, deux réglages : à cette
+# échelle, un aller-retour tient dans une nuit, et les conclusions se
+# transposent le plus souvent à futo-small. C'est le bon endroit pour se
+# tromper, avant de payer un GPU.
+#
+# La mémoire n'est pas le facteur limitant : 39 M × 16 octets = 630 Mo pour les
+# poids, les gradients et les moments d'Adam. Cela passe sur un Mac de 16 Go.
+#
+# ATTENTION : les durées ci-dessus sont CALCULÉES, jamais mesurées — aucun Mac
+# n'a servi à écrire ce dépôt. Le premier run donnera le vrai débit en tokens/s
+# affiché par la boucle ; c'est ce chiffre qu'il faudra reporter ici.
+hérite: commun.yaml
+nom: futo-mac
+
+model:
+  vocab_size: 32768
+  block_size: 1024
+  n_layer: 8
+  n_head: 8
+  n_kv_head: 2
+  d_model: 512
+  dropout: 0.0
+
+data:
+  batch_size: 8
+
+train:
+  # 8 × 1024 × 16 = 131 072 tokens par pas ; 11 400 pas ≈ 1,49 G tokens.
+  max_steps: 11400
+  grad_accum: 16
+  lr: 8.0e-4
+  warmup_steps: 300
+  # WSD plutôt que cosinus : sur une machine de bureau, on veut pouvoir
+  # prolonger ou écourter un entraînement sans invalider le planning.
+  schedule: wsd
+  decay_steps: 1500
+  eval_every: 500
+  eval_batches: 50
+  save_every: 500
+  dossier_sortie: sorties/mac

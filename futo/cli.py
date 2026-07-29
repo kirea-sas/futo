@@ -73,24 +73,56 @@ def cmd_info(args) -> int:
     print(f"  {flops_total / 1e18:.3f} EFLOP pour l'entraînement complet")
     print()
 
-    print("Durée estimée selon le matériel, à 40 % de MFU :")
-    from .train import FLOPS_CRETE
+    from .train import (
+        FLOPS_CRETE,
+        choisir_peripherique,
+        flops_crete_du_materiel,
+        nom_du_materiel,
+    )
 
-    for nom, crete in FLOPS_CRETE.items():
-        heures = flops_total / (crete * 0.40) / 3600
+    def duree(heures: float) -> str:
         if heures < 0.05:
-            duree = f"{heures * 60:.0f} min"
-        elif heures < 72:
-            duree = f"{heures:.1f} h"
-        else:
-            duree = f"{heures / 24:.1f} j"
-        print(f"  {nom:<6} {duree:>9}")
+            return f"{heures * 60:.0f} min"
+        if heures < 72:
+            return f"{heures:.1f} h"
+        return f"{heures / 24:.1f} j"
+
+    # D'abord la machine sur laquelle la commande tourne : c'est le chiffre que
+    # l'utilisateur cherche en premier.
+    peripherique = choisir_peripherique()
+    local = nom_du_materiel(peripherique)
+    crete_locale = flops_crete_du_materiel(local)
+    mfu_local = 0.40 if peripherique.type == "cuda" else 0.15
+    print(f"Votre machine : {local} ({peripherique.type})")
+    if crete_locale > 0:
+        print(
+            f"  environ {duree(flops_total / (crete_locale * mfu_local) / 3600)} "
+            f"à {mfu_local * 100:.0f} % de MFU"
+        )
+    elif peripherique.type == "cpu":
+        print("  entraînement sur processeur : utilisable pour futo-tiny seulement.")
+    else:
+        print("  matériel non répertorié : durée inestimable, lancez et mesurez.")
     print()
-    print("  Ces durées supposent un MFU de 40 %, atteignable mais optimiste sur")
-    print("  un petit modèle : en dessous de 200 M de paramètres, le surcoût des")
-    print("  noyaux et du chargement fait souvent tomber le MFU à 20-30 %.")
-    print("  Multipliez par 1,5 à 2 pour une estimation prudente, et ajoutez le")
-    print("  prix horaire de location pour obtenir un coût.")
+
+    # Puis le reste, séparé en deux familles : le MFU atteignable n'est pas du
+    # tout le même sur CUDA et sur le GPU intégré d'un Mac.
+    nvidia = ["H100", "A100", "L40S", "4090", "3090"]
+    apple = ["M3 Ultra", "M4 Max", "M3 Max", "M2 Max", "M4 Pro", "M2"]
+
+    print("Ailleurs, à 40 % de MFU (cartes NVIDIA) :")
+    for nom in nvidia:
+        print(f"  {nom:<9} {duree(flops_total / (FLOPS_CRETE[nom] * 0.40) / 3600):>9}")
+    print()
+    print("À 15 % de MFU (Apple Silicon, ordre de grandeur — voir docs/MAC.md) :")
+    for nom in apple:
+        print(f"  {nom:<9} {duree(flops_total / (FLOPS_CRETE[nom] * 0.15) / 3600):>9}")
+    print()
+    print("  Ces durées sont CALCULÉES, pas mesurées. 40 % de MFU est atteignable")
+    print("  mais optimiste : sous 200 M de paramètres, le surcoût des noyaux et")
+    print("  du chargement fait souvent tomber le MFU à 20-30 % sur GPU, et le")
+    print("  chiffre Apple est un ordre de grandeur. Comptez 1,5 à 2 fois plus")
+    print("  pour être prudent, et ajoutez le prix horaire pour obtenir un coût.")
     return 0
 
 

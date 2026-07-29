@@ -51,11 +51,12 @@ affaire d'échelle.
 
 ---
 
-## Les quatre tailles
+## Les cinq tailles
 
 | Configuration | Paramètres | Couches | d_model | Contexte | Budget visé | Calcul | Où l'entraîner |
 |---|---|---|---|---|---|---|---|
 | `futo-tiny`  | 1,3 M     | 4  | 128  | 256   | —          | —          | un processeur, 45 s |
+| `futo-mac`   | 39,3 M    | 8  | 512  | 1 024 | 1,5 G tokens| 0,43 EFLOP | un Mac, ~2,5 j (voir [docs/MAC.md](docs/MAC.md)) |
 | `futo-small` | 100,7 M   | 12 | 768  | 1 024 | 10 G tokens| 7,1 EFLOP  | 1 GPU, ~5 h sur H100, 20-40 € |
 | `futo-base`  | 299,4 M   | 24 | 1 024| 2 048 | 30 G tokens| 72 EFLOP   | 1 GPU, ~50 h sur H100, 150-250 € |
 | `futo-large` | 1 180,8 M | 24 | 2 048| 2 048 | 100 G tokens| 829 EFLOP | 8 GPU, ~3 j, 1 500-2 500 € |
@@ -65,11 +66,18 @@ configuration s'écarte de ce qui est annoncé. Les durées supposent 40 % de MF
 et sont donc optimistes — comptez 1,5 à 2 fois plus pour les petits modèles, où
 le surcoût des noyaux fait tomber le MFU à 20-30 %.
 
-Pour voir le détail d'une configuration avant de louer quoi que ce soit :
+Pour voir le détail d'une configuration avant de louer quoi que ce soit —
+la commande commence par estimer la durée **sur votre propre machine** :
 
 ```bash
 futo info configs/futo-small.yaml
 ```
+
+Sur un Mac Apple Silicon, le GPU intégré est détecté et utilisé sans réglage.
+Un Mac ne mènera pas le run complet de `futo-small` (plus d'un mois), mais il
+est le bon outil pour tout ce qui vient avant : entraîner le tokenizer,
+préparer les shards, et comparer des mélanges de corpus avec `futo-mac`.
+Voir [docs/MAC.md](docs/MAC.md).
 
 Le budget de tokens visé est d'environ 100 tokens par paramètre, soit cinq fois
 le ratio de Chinchilla. C'est délibéré : Chinchilla minimise le coût de
@@ -219,7 +227,7 @@ configs/         les quatre tailles, plus les réglages communs
 data/echantillon/  142 Ko de français original, pour les tests hors ligne
 data/sondes/     les 72 paires minimales françaises
 tests/           161 tests, 11 s sur processeur, sans réseau
-docs/            architecture, données, carte du modèle
+docs/            architecture, données, carte du modèle, Mac
 ```
 
 ---

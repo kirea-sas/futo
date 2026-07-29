@@ -33,7 +33,17 @@ from .config import FutoConfig
 from .data import ChargeurTokens
 from .model import Futo
 
-__all__ = ["entrainer", "taux_apprentissage", "sauvegarder", "charger", "Journal"]
+__all__ = [
+    "entrainer",
+    "taux_apprentissage",
+    "sauvegarder",
+    "charger",
+    "Journal",
+    "choisir_peripherique",
+    "nom_du_materiel",
+    "flops_crete_du_materiel",
+    "contexte_autocast",
+]
 
 
 # --------------------------------------------------------------------------- #
@@ -89,6 +99,11 @@ def taux_apprentissage(pas: int, cfg: FutoConfig) -> float:
 # FLOPs crête en bf16/fp16 (calcul dense, sans parcimonie), d'après les fiches
 # constructeur. Servent uniquement au calcul du MFU ; un chiffre absent donne un
 # MFU nul, jamais une erreur.
+#
+# Les valeurs Apple sont des ORDRES DE GRANDEUR. Apple ne publie pas de chiffre
+# de FLOPs crête comparable à celui des cartes NVIDIA ; ceux-ci sont déduits du
+# nombre de cœurs GPU et de la fréquence. Le MFU affiché sur un Mac est donc
+# indicatif, et ne doit pas être comparé directement à celui d'un H100.
 FLOPS_CRETE = {
     "H100": 989e12,
     "H200": 989e12,
@@ -99,36 +114,109 @@ FLOPS_CRETE = {
     "4080": 98e12,
     "3090": 71e12,
     "V100": 125e12,
+    # Apple Silicon — approximatif, voir ci-dessus.
+    "M4 Max": 18e12,
+    "M4 Pro": 9e12,
+    "M3 Ultra": 28e12,
+    "M3 Max": 14e12,
+    "M3 Pro": 7e12,
+    "M2 Ultra": 27e12,
+    "M2 Max": 13.6e12,
+    "M2 Pro": 7e12,
+    "M1 Ultra": 21e12,
+    "M1 Max": 10.4e12,
+    "M1 Pro": 5.2e12,
+    "M4": 5e12,
+    "M3": 4e12,
+    "M2": 3.6e12,
+    "M1": 2.6e12,
 }
 
 
-def flops_crete_du_materiel(nom_gpu: str | None = None) -> float:
-    """Devine les FLOPs crête à partir du nom de la carte."""
-    if nom_gpu is None:
-        if not torch.cuda.is_available():
-            return 0.0
-        nom_gpu = torch.cuda.get_device_name(0)
-    for cle, valeur in FLOPS_CRETE.items():
-        if cle.lower() in nom_gpu.lower():
-            return valeur
+def nom_du_materiel(peripherique: torch.device | None = None) -> str:
+    """Nom lisible de l'accélérateur : « NVIDIA H100 », « Apple M3 Max », « processeur »."""
+    if peripherique is None:
+        peripherique = choisir_peripherique()
+    if peripherique.type == "cuda" and torch.cuda.is_available():
+        return torch.cuda.get_device_name(0)
+    if peripherique.type == "mps":
+        # PyTorch n'expose pas le nom de la puce : on le demande au système.
+        # Lecture seule, et sans conséquence si la commande n'existe pas.
+        import subprocess
+
+        try:
+            sortie = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"],
+                capture_output=True, text=True, timeout=2, check=True,
+            )
+            if sortie.stdout.strip():
+                return sortie.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return "Apple Silicon (puce non identifiée)"
+    return "processeur"
+
+
+def flops_crete_du_materiel(nom: str | None = None) -> float:
+    """Devine les FLOPs crête à partir du nom du matériel.
+
+    Renvoie 0 si le matériel est inconnu : le MFU s'affiche alors comme nul,
+    plutôt que faux. Les clés sont essayées de la plus longue à la plus courte,
+    sinon « M3 » masquerait « M3 Max ».
+    """
+    if nom is None:
+        nom = nom_du_materiel()
+    nom_bas = nom.lower()
+    for cle in sorted(FLOPS_CRETE, key=len, reverse=True):
+        if cle.lower() in nom_bas:
+            return FLOPS_CRETE[cle]
     return 0.0
 
 
 def choisir_peripherique() -> torch.device:
+    """CUDA si présent, sinon le GPU intégré d'un Mac (MPS), sinon le processeur."""
     if torch.cuda.is_available():
         return torch.device("cuda")
-    if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
         return torch.device("mps")
     return torch.device("cpu")
 
 
-def resoudre_dtype(demande: str, peripherique: torch.device) -> torch.dtype:
-    """Retient le meilleur type disponible, en le disant si on doit se rabattre."""
+def contexte_autocast(peripherique: torch.device, dtype: torch.dtype, dire=print):
+    """Construit le contexte de précision mixte, avec un repli *vérifié*.
+
+    Le cas délicat est celui du Mac : la prise en charge de l'autocast sur MPS
+    dépend de la version de PyTorch et du type demandé, et une combinaison non
+    gérée échoue au premier pas — donc après le chargement du modèle et des
+    données. Plutôt que de le supposer, on l'essaie ici sur un tenseur
+    minuscule ; si ça ne passe pas, on retombe en float32 en le disant.
+    """
+    if dtype == torch.float32:
+        return nullcontext()
+    try:
+        with torch.autocast(device_type=peripherique.type, dtype=dtype):
+            a = torch.ones(2, 2, device=peripherique)
+            _ = a @ a
+    except (RuntimeError, ValueError, NotImplementedError, TypeError) as e:
+        dire(
+            f"  autocast {str(dtype).replace('torch.', '')} indisponible sur "
+            f"{peripherique.type} — repli sur float32 ({str(e)[:60]})."
+        )
+        return nullcontext()
+    return torch.autocast(device_type=peripherique.type, dtype=dtype)
+
+
+def resoudre_dtype(demande: str, peripherique: torch.device, dire=print) -> torch.dtype:
+    """Retient le meilleur type disponible, en annonçant tout repli.
+
+    Un repli silencieux se paierait en heures de calcul inexpliquées.
+    """
     if demande == "fp32":
         return torch.float32
     if demande == "bf16":
         if peripherique.type == "cuda" and not torch.cuda.is_bf16_supported():
-            print("  bf16 non pris en charge par ce GPU, repli sur fp16.")
+            dire("  bf16 non pris en charge par ce GPU, repli sur fp16.")
             return torch.float16
         return torch.bfloat16
     return torch.float16
@@ -371,22 +459,18 @@ def entrainer(cfg: FutoConfig, verbeux: bool = True) -> ResultatEntrainement:
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-    else:
+    elif torch.cuda.is_available():
         # TF32 : division par ~3 du temps des matmuls sur Ampère et au-delà,
         # pour une perte de précision sans effet mesurable à l'entraînement.
+        # Ces bascules n'existent que sur CUDA.
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
 
     peripherique = choisir_peripherique()
     if distribue:
         peripherique = torch.device(f"cuda:{rang_local}")
-    dtype = resoudre_dtype(t.dtype, peripherique)
-
-    # L'autocast n'existe pas sur MPS et n'a pas d'intérêt en fp32.
-    if dtype == torch.float32 or peripherique.type == "mps":
-        contexte = nullcontext()
-    else:
-        contexte = torch.autocast(device_type=peripherique.type, dtype=dtype)
+    dtype = resoudre_dtype(t.dtype, peripherique, dire)
+    contexte = contexte_autocast(peripherique, dtype, dire)
 
     # -- données ------------------------------------------------------------ #
     chargeur = ChargeurTokens(
@@ -432,9 +516,13 @@ def entrainer(cfg: FutoConfig, verbeux: bool = True) -> ResultatEntrainement:
         # nettement plus rapide dès que le modèle a beaucoup de tenseurs.
         fused=peripherique.type == "cuda",
     )
-    # Le scaler ne sert qu'en fp16 : bf16 a le même exposant que fp32 et ne
-    # déborde pas, il n'a donc pas besoin d'être mis à l'échelle.
-    scaler = torch.amp.GradScaler(enabled=(dtype == torch.float16))
+    # Le scaler ne sert qu'en fp16 sur CUDA : bf16 a le même exposant que fp32
+    # et ne déborde pas, et la mise à l'échelle n'est pas prise en charge sur
+    # MPS ni sur processeur. Désactivé, il se traverse sans rien faire.
+    scaler = torch.amp.GradScaler(
+        device=peripherique.type,
+        enabled=(dtype == torch.float16 and peripherique.type == "cuda"),
+    )
 
     pas_depart = 0
     meilleure_val = float("inf")
@@ -474,9 +562,9 @@ def entrainer(cfg: FutoConfig, verbeux: bool = True) -> ResultatEntrainement:
     if maitre:
         dire(cfg.resume(monde))
         dire(
-            f"  matériel : {peripherique.type}"
+            f"  matériel : {nom_du_materiel(peripherique)}"
             + (f" ×{monde}" if monde > 1 else "")
-            + f" · {dtype}".replace("torch.", " ")
+            + f" · {str(dtype).replace('torch.', '')}"
         )
         dire(f"  corpus : {len(chargeur):,} tokens".replace(",", " "))
         dire()

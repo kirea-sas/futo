@@ -12,8 +12,10 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
       accumulation de gradient, DDP, MFU, journal JSONL + CSV
 - [x] Évaluation : perplexité, bits par octet, 72 paires minimales françaises
 - [x] Ligne de commande complète (`info`, `tokenizer`, `data`, `train`, `eval`, `generer`)
-- [x] Quatre configurations chiffrées et vérifiées par test (1,3 M / 100,7 M /
-      299,4 M / 1 180,8 M)
+- [x] Cinq configurations chiffrées et vérifiées par test (1,3 M / 39,3 M /
+      100,7 M / 299,4 M / 1 180,8 M)
+- [x] Prise en charge du Mac (MPS) : détection de la puce, précision mixte
+      essayée puis repli annoncé, configuration `futo-mac` — voir docs/MAC.md
 - [x] Corpus d'exemple original de 142 Ko, licence propre, pour les tests hors ligne
 - [x] 161 tests, 11 s sur processeur, sans réseau — CI GitHub Actions
 
@@ -70,6 +72,10 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
       cela reste à automatiser une fois les sources arrêtées
 - [ ] Aucune mesure de MFU réelle sur GPU — les durées annoncées sont calculées,
       pas mesurées. À corriger au premier entraînement
+- [ ] Le chemin Mac (MPS) n'a jamais été exécuté : le dépôt a été écrit sur un
+      processeur Linux sans GPU. Les FLOPs crête Apple sont des ordres de
+      grandeur, et les durées de docs/MAC.md des estimations. Le premier run sur
+      Mac doit donner le vrai débit en tokens/s et remplacer ces chiffres
 
 ## 📏 Chiffres mesurés à ce jour
 

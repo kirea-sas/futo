@@ -163,6 +163,7 @@ def test_configs_annoncent_leur_taille_reelle():
     dossier = Path(__file__).resolve().parent.parent / "configs"
     attendus = {
         "futo-tiny": (1e6, 2e6),
+        "futo-mac": (35e6, 45e6),
         "futo-small": (95e6, 105e6),
         "futo-base": (290e6, 310e6),
         "futo-large": (1.15e9, 1.25e9),
