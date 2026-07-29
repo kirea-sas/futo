@@ -18,6 +18,12 @@ tokens de français nécessaires est un travail à part, décrit dans
 [docs/DONNEES.md](docs/DONNEES.md) — et c'est le vrai obstacle du projet, bien
 plus que le calcul.
 
+**Par où commencer pour de vrai.** La Wikipédia francophone : à peu près la
+bonne taille pour `futo-mac`, déjà propre, et donc sans le pipeline de filtrage
+qu'exige le web brut. Un dump se convertit en une commande —
+`futo data wikipedia <dump>` — qui nettoie le wikitexte, écrit le JSONL attendu
+et consigne la source. Reste à trancher la licence CC BY-SA avant d'entraîner.
+
 ---
 
 ## Essayer en cinq minutes
@@ -239,13 +245,14 @@ futo/
   model.py       le transformeur : RMSNorm, RoPE, GQA, SwiGLU, cache KV
   tokenizer.py   BPE au niveau octet, découpe adaptée au français
   data.py        format de shards, préparation, chargeur déterministe
+  wikipedia.py   conversion d'un dump Wikipédia en corpus
   train.py       boucle d'entraînement, plannings, checkpoints, MFU, journal
   eval.py        perplexité, bits par octet, sondes grammaticales
   cli.py         la commande « futo », dont « bench » (débit réel mesuré)
 configs/         les quatre tailles, plus les réglages communs
 data/echantillon/  142 Ko de français original, pour les tests hors ligne
 data/sondes/     les 72 paires minimales françaises
-tests/           190 tests, 17 s sur processeur, sans réseau
+tests/           234 tests, 17 s sur processeur, sans réseau
 docs/            architecture, données, carte du modèle, Mac
 ```
 
@@ -257,7 +264,7 @@ docs/            architecture, données, carte du modèle, Mac
 pytest
 ```
 
-190 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
+234 tests, 17 secondes sur quatre cœurs, aucun accès réseau. Les plus importants
 ne vérifient pas des formes de tenseurs mais des propriétés qu'un modèle peut
 violer en silence :
 

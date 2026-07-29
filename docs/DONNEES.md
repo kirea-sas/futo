@@ -49,11 +49,29 @@ respectives varient selon les millésimes.
 ### Textes soignés — la qualité
 
 **Wikipédia en français** — la source propre par excellence : encyclopédique,
-relue, bien structurée. Deux passes sont raisonnables. **Attention à la
-licence** : CC BY-SA impose l'attribution *et* le partage à l'identique. Son
-effet sur la licence des poids entraînés est un point juridique non tranché ;
-si vous voulez publier des poids sous Apache 2.0 sans discussion possible,
-c'est un sujet à instruire avant l'entraînement.
+relue, bien structurée, et **le point de départ recommandé**. C'est aussi la
+seule source pour laquelle Futo fournit l'outillage complet :
+
+```bash
+futo data wikipedia frwiki-latest-pages-articles.xml.bz2
+```
+
+Le dump se récupère sur `dumps.wikimedia.org`, dans le fichier
+`frwiki-latest-pages-articles.xml.bz2` (plusieurs gigaoctets). La commande le
+lit en flux — jamais en mémoire —, nettoie le wikitexte (modèles imbriqués,
+tableaux, liens, références, catégories, sections de fin), écrit le JSONL
+attendu par `futo data preparer`, et consigne la source dans `data/SOURCES.md`.
+Essayez d'abord sur un échantillon : `--articles-max 1000`.
+
+Le nettoyage préserve ce qui fait le français : élisions, apostrophes
+typographiques, ligatures, guillemets et espaces insécables. Il est testé sur
+des fragments écrits à la main, **jamais sur un vrai dump** — les surprises
+viendront de là.
+
+**Attention à la licence** : CC BY-SA impose l'attribution *et* le partage à
+l'identique. Son effet sur la licence des poids entraînés est un point juridique
+non tranché ; si vous voulez publier des poids sous Apache 2.0 sans discussion
+possible, c'est un sujet à instruire **avant** l'entraînement, pas après.
 
 **Wikisource, Gallica, Projet Gutenberg** **[À VÉRIFIER]** — littérature du
 domaine public. Excellent français, mais daté : un modèle nourri

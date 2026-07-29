@@ -275,6 +275,39 @@ def cmd_data_info(args) -> int:
     return 0
 
 
+def cmd_data_wikipedia(args) -> int:
+    """Convertit un dump Wikipédia en corpus JSONL."""
+    from .wikipedia import consigner_source, convertir_dump
+
+    dump = Path(args.dump)
+    print(f"Conversion de {dump.name} "
+          f"({dump.stat().st_size / 2**30:.1f} Gio compressés)")
+    print("  Cela peut prendre de longues minutes sur un dump complet.")
+    print()
+
+    resultat = convertir_dump(
+        dump,
+        args.sortie,
+        articles_max=args.articles_max,
+        longueur_min=args.longueur_min,
+        journal=print if not args.silencieux else None,
+    )
+    print()
+    print(f"{resultat}")
+    print(f"Écrit dans {resultat.chemin}")
+
+    if not args.sans_journal_des_sources:
+        consigner_source(args.sources, args.nom, dump, resultat, licence=args.licence)
+        print(f"Source consignée dans {args.sources}")
+
+    print()
+    print("Suite :")
+    print(f"  futo tokenizer entrainer --corpus {resultat.chemin} --vocab 32768 \\")
+    print("                           --octets-max 2000000000")
+    print(f"  futo data preparer --corpus {resultat.chemin} --separateur jsonl")
+    return 0
+
+
 def cmd_data_telecharger(args) -> int:
     """Explique comment récupérer un vrai corpus français.
 
@@ -320,8 +353,17 @@ consciente. Voici la marche à suivre.
    Ces descriptions valent orientation, pas garantie : contrôlez vous-même le
    volume réel de français, la licence, et la date de collecte.
 
-3. Convertissez au format attendu : un fichier .jsonl (éventuellement .gz), un
-   document par ligne, avec un champ « text ».
+3. Pour Wikipédia, tout est automatisé. Récupérez le dump
+   « frwiki-latest-pages-articles.xml.bz2 » depuis dumps.wikimedia.org, puis :
+
+       futo data wikipedia frwiki-latest-pages-articles.xml.bz2
+
+   La commande nettoie le wikitexte, écrit le JSONL attendu, et consigne la
+   source dans data/SOURCES.md. Essayez d'abord sur un échantillon avec
+   --articles-max 1000.
+
+   Pour les autres sources, convertissez vous-même au format attendu : un
+   fichier .jsonl (éventuellement .gz), un document par ligne, champ « text ».
 
 4. Préparez les shards :
 
@@ -537,6 +579,23 @@ Chaque commande accepte --set pour surcharger la configuration :
     p = sous_data.add_parser("info", help="liste les shards d'un dossier")
     p.add_argument("dossier", nargs="?", default="data/prepare")
     p.set_defaults(fonction=cmd_data_info)
+
+    p = sous_data.add_parser(
+        "wikipedia", help="convertit un dump Wikipédia en corpus JSONL"
+    )
+    p.add_argument("dump", help="fichier frwiki-…-pages-articles.xml.bz2")
+    p.add_argument("--sortie", default="data/brut/wikipedia-fr.jsonl")
+    p.add_argument("--articles-max", type=int, default=None,
+                   help="s'arrête après N articles (pour essayer sans tout traiter)")
+    p.add_argument("--longueur-min", type=int, default=200,
+                   help="écarte les articles plus courts que N caractères")
+    p.add_argument("--nom", default="Wikipédia FR")
+    p.add_argument("--licence", default="CC BY-SA 4.0")
+    p.add_argument("--sources", default="data/SOURCES.md")
+    p.add_argument("--sans-journal-des-sources", action="store_true",
+                   help="n'écrit pas dans data/SOURCES.md (déconseillé)")
+    p.add_argument("--silencieux", action="store_true")
+    p.set_defaults(fonction=cmd_data_wikipedia)
 
     p = sous_data.add_parser("telecharger", help="marche à suivre pour un vrai corpus français")
     p.set_defaults(fonction=cmd_data_telecharger)

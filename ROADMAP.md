@@ -17,7 +17,7 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 - [x] Prise en charge du Mac (MPS) : détection de la puce, précision mixte
       essayée puis repli annoncé, configuration `futo-mac` — voir docs/MAC.md
 - [x] Corpus d'exemple original de 142 Ko, licence propre, pour les tests hors ligne
-- [x] 190 tests, 18 s sur processeur, sans réseau — CI GitHub Actions,
+- [x] 234 tests, 17 s sur processeur, sans réseau — CI GitHub Actions,
       et le démarrage du README rejoué depuis un clone neuf dans un
       environnement virtuel vierge, jusqu'à la génération de texte,
       dont des tests de la DOCUMENTATION : les blocs de commandes doivent
@@ -29,8 +29,18 @@ Suivi des chantiers. Un à la fois, coché quand c'est fait et **mesuré**.
 
 C'est **le** sujet. Le reste est de la plomberie déjà écrite.
 
-- [ ] Choisir les sources et **vérifier chaque identifiant et chaque licence**
-      (voir les mentions [À VÉRIFIER] dans [docs/DONNEES.md](docs/DONNEES.md))
+- [x] **Ingestion de Wikipédia** : `futo data wikipedia <dump>` nettoie le
+      wikitexte (modèles imbriqués, tableaux, liens, références, catégories),
+      écrit le JSONL attendu et consigne la source. Lecture en flux, jamais en
+      mémoire. 44 tests, dont la préservation des élisions, des ligatures et des
+      espaces insécables du français
+- [ ] Lancer la conversion sur le vrai dump francophone et mesurer le volume
+      réel en tokens — l'estimation « à peu près la bonne taille pour futo-mac »
+      n'est pas vérifiée
+- [ ] **Trancher la licence CC BY-SA** avant d'entraîner quoi que ce soit sur
+      Wikipédia : l'effet du partage à l'identique sur des poids n'est pas tranché
+- [ ] Choisir les autres sources et **vérifier chaque identifiant et chaque
+      licence** (mentions [À VÉRIFIER] dans [docs/DONNEES.md](docs/DONNEES.md))
 - [ ] Tenir `data/SOURCES.md` dès le premier téléchargement — exigé par le
       règlement européen sur l'IA, et impossible à reconstituer après coup
 - [ ] Écrire le pipeline de filtrage, avec des seuils **ré-étalonnés sur le
@@ -73,9 +83,12 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
 - [ ] Le tirage des fenêtres se fait avec remise plutôt que par permutation
       exacte du corpus. Négligeable sur une seule époque, à revoir si l'on passe
       à plusieurs passes
-- [ ] `futo data telecharger` n'affiche qu'une marche à suivre : c'est
-      volontaire tant que les identifiants de corpus ne sont pas vérifiés, mais
-      cela reste à automatiser une fois les sources arrêtées
+- [ ] Le nettoyeur de wikitexte n'a jamais vu de vrai dump : il est testé sur
+      des fragments écrits à la main. Les surprises viendront des cas tordus
+      d'un dump de plusieurs gigaoctets
+- [ ] `futo data telecharger` n'affiche qu'une marche à suivre pour les sources
+      autres que Wikipédia — volontaire tant que leurs identifiants ne sont pas
+      vérifiés
 - [ ] Aucune mesure de MFU réelle sur GPU — les durées annoncées sont calculées,
       pas mesurées. À corriger au premier entraînement
 - [x] ~~Le chemin Mac (MPS) n'a jamais été exécuté~~ — fait le 29/07 sur
@@ -102,8 +115,8 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 | Fertilité du tokenizer | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
 | Mots rendus en un seul token | 62,6 % | idem |
 | Aller-retour tokenizer | exact | accents, ligatures, guillemets, émojis, code |
-| Suite de tests | 190 tests, 18 s | 4 cœurs, hors ligne |
-| Suite de tests | 190 tests, 14 s | Apple M2 Max |
+| Suite de tests | 234 tests, 17 s | 4 cœurs, hors ligne |
+| Suite de tests | 14 s (190 tests à la date de la mesure) | Apple M2 Max |
 | Débit `futo-tiny` | 57 000-60 000 tokens/s | **Apple M2 Max**, MPS, fp32 |
 | Entraînement `futo-tiny` | 400 pas en 15,6 s | **Apple M2 Max**, MPS, fp32 |
 | MFU `futo-tiny` | 4,0-4,2 % | M2 Max, fp32 contre crête bf16 — non représentatif |
