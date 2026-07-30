@@ -251,3 +251,55 @@ def test_sondes_phrases_identiques_sont_refusees(tmp_path):
     )
     with pytest.raises(ValueError, match="identiques"):
         charger_sondes(chemin)
+
+
+def test_les_suggestions_comptent_le_rang_pas_la_probabilite(tmp_path):
+    """Un clavier ne montre que k cases : seul le RANG du bon mot compte.
+
+    Vérifié sur un modèle truqué dont on connaît l'ordre des logits : la cible
+    placée au rang 3 doit compter pour top-3, top-4 et top-5, jamais pour top-1.
+    """
+    import torch
+
+    from futo.eval import mesurer_suggestions
+
+    class ModeleTruque(torch.nn.Module):
+        """Renvoie toujours le même classement : 0 > 1 > 2 > 3 > …"""
+
+        def __init__(self, vocab):
+            super().__init__()
+            self.vocab = vocab
+            self.bidon = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, entree, cibles=None, tous_les_pas=False):
+            b, t = entree.shape
+            rangs = torch.arange(self.vocab, dtype=torch.float32)
+            logits = (-rangs).expand(b, t, self.vocab).contiguous()
+            return logits, None
+
+    class TokenizerTruque:
+        vocab_size = 8
+
+        def decoder(self, ids, sauter_speciaux=True):
+            # seuls les identifiants pairs ouvrent un mot
+            return " mot" if ids[0] % 2 == 0 else "suite"
+
+    class ChargeurTruque:
+        def lot(self, i):
+            entree = torch.zeros(1, 4, dtype=torch.long)
+            # cibles : rang 0, rang 2, rang 3, rang 5 dans le classement
+            cible = torch.tensor([[0, 2, 3, 5]], dtype=torch.long)
+            return entree, cible
+
+    r = mesurer_suggestions(ModeleTruque(8), ChargeurTruque(), TokenizerTruque(), 1,
+                            ks=(1, 3, 4, 5), peripherique=torch.device("cpu"))
+    assert r.n_tokens == 4
+    assert r.reussites[1] == 1           # seule la cible 0 est en tête
+    assert r.reussites[3] == 2           # cibles 0 et 2
+    assert r.reussites[4] == 3           # + cible 3
+    assert r.reussites[5] == 3           # cible 5 est au rang 6, toujours dehors
+    # débuts de mot : identifiants pairs, soit les cibles 0 et 2
+    assert r.n_debuts_de_mot == 2
+    assert r.reussites_mots[4] == 2
+    assert 0.0 < r.taux(4) < 1.0
+    assert r.taux_mots(1) == 0.5

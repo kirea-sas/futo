@@ -84,6 +84,27 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
 - [x] ~~Décider de la licence des poids avant l'entraînement~~ — fait le 29/07 :
       CC BY-SA 4.0
 
+## 🎹 Piste produit — clavier à suggestions
+
+Idée de Guillaume (30/07) : quatre cases au-dessus des touches, le bon mot
+dedans. C'est exactement la tâche du modèle — prédire le mot suivant — mais la
+perplexité n'y répond pas : elle note la probabilité du bon mot, jamais son
+RANG, et un clavier ne montre que quatre rangs.
+
+- [x] `futo eval` mesure désormais le taux de réussite top-1/3/4/5, sur tous les
+      tokens ET sur les seuls débuts de mot. La seconde mesure est la seule
+      honnête : compléter « aujourd' » par « hui » est facile, proposer le mot
+      suivant quand rien n'est encore tapé l'est beaucoup moins
+- [ ] Relever le chiffre sur un point de reprise de `futo-mac`
+- [ ] Obstacle connu, et il est de fond : le modèle est entraîné sur Wikipédia.
+      Un clavier sert à écrire des messages, pas des articles encyclopédiques.
+      Le registre ne correspond pas, et aucune quantité d'entraînement ne
+      corrigera cela — il faut du corpus conversationnel (sous-titres, forums)
+- [ ] Autres travaux nécessaires avant tout produit : contrainte de préfixe
+      (ne proposer que des mots compatibles avec ce qui est déjà tapé),
+      poursuite des mots en plusieurs tokens, quantification pour tenir sur un
+      téléphone (39 M de paramètres ≈ 79 Mo en fp16, 20 Mo en int4)
+
 ## ⬜ Plus tard
 
 - [ ] `futo-base` (150-250 €), si `futo-small` tient ses promesses

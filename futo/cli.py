@@ -459,7 +459,12 @@ def cmd_train(args) -> int:
 
 def cmd_eval(args) -> int:
     from .data import ChargeurTokens
-    from .eval import mesurer_bits_par_octet, mesurer_perplexite, mesurer_sondes
+    from .eval import (
+        mesurer_bits_par_octet,
+        mesurer_perplexite,
+        mesurer_sondes,
+        mesurer_suggestions,
+    )
     from .tokenizer import TokenizerFuto
     from .train import charger, choisir_peripherique
 
@@ -482,6 +487,12 @@ def cmd_eval(args) -> int:
         )
         resultat = mesurer_perplexite(modele, chargeur, args.lots, peripherique)
         print(f"Validation ({args.lots} lots) : {resultat}")
+        # Suggestions : le bon mot est-il dans les k proposés ? La perplexité
+        # note la probabilité du bon mot, jamais son rang — or un clavier ne
+        # montre que quatre cases, et seul le rang y décide.
+        sugg = mesurer_suggestions(modele, chargeur, tokenizer, args.lots,
+                                   peripherique=peripherique)
+        print(f"Suggestions : {sugg}")
     except FileNotFoundError as e:
         print(f"Perplexité non calculée : {e}")
 

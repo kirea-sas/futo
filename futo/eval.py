@@ -41,9 +41,11 @@ import torch
 __all__ = [
     "ResultatPerplexite",
     "ResultatSondes",
+    "ResultatSuggestions",
     "mesurer_perplexite",
     "mesurer_bits_par_octet",
     "mesurer_sondes",
+    "mesurer_suggestions",
     "charger_sondes",
 ]
 
@@ -158,6 +160,106 @@ def mesurer_bits_par_octet(
     return ResultatPerplexite(
         perte=total_nll / total_tokens, n_tokens=total_tokens, n_octets=total_octets
     )
+
+
+# --------------------------------------------------------------------------- #
+# Suggestions : le bon mot est-il dans les k proposés ?
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class ResultatSuggestions:
+    """Taux de réussite d'un clavier à suggestions.
+
+    Deux mesures, et la seconde est la seule qui compte pour un clavier.
+
+    Sur TOUS les tokens, on mesure la prédiction du morceau suivant, quel qu'il
+    soit — y compris la fin d'un mot commencé (« aujourd' » puis « hui »). Ce
+    chiffre est flatteur : compléter un mot déjà entamé est facile.
+
+    Sur les DÉBUTS DE MOT seulement — les tokens qui commencent par une espace —
+    on mesure ce que fait vraiment un clavier : proposer le mot suivant alors
+    que l'utilisateur n'a encore rien tapé. C'est nettement plus dur, et c'est
+    le chiffre à publier.
+    """
+
+    n_tokens: int = 0
+    n_debuts_de_mot: int = 0
+    reussites: dict[int, int] = field(default_factory=dict)
+    reussites_mots: dict[int, int] = field(default_factory=dict)
+
+    def taux(self, k: int) -> float:
+        return self.reussites.get(k, 0) / max(self.n_tokens, 1)
+
+    def taux_mots(self, k: int) -> float:
+        return self.reussites_mots.get(k, 0) / max(self.n_debuts_de_mot, 1)
+
+    def __str__(self) -> str:
+        ks = sorted(self.reussites)
+        tous = " · ".join(f"top-{k} {100 * self.taux(k):.1f} %" for k in ks)
+        mots = " · ".join(f"top-{k} {100 * self.taux_mots(k):.1f} %" for k in ks)
+        return (
+            f"tous les tokens ({self.n_tokens}) : {tous}\n"
+            f"  débuts de mot ({self.n_debuts_de_mot}) : {mots}"
+        )
+
+
+def _debuts_de_mot(tokenizer) -> torch.Tensor:
+    """Masque booléen du vocabulaire : ce token ouvre-t-il un mot ?
+
+    Un token ouvre un mot s'il se décode en une chaîne commençant par une
+    espace. Les tokens spéciaux et la ponctuation collée n'en sont pas.
+    """
+    taille = tokenizer.vocab_size
+    masque = torch.zeros(taille, dtype=torch.bool)
+    for identifiant in range(taille):
+        texte = tokenizer.decoder([identifiant], sauter_speciaux=False)
+        masque[identifiant] = texte.startswith(" ") and len(texte) > 1
+    return masque
+
+
+@torch.no_grad()
+def mesurer_suggestions(
+    modele,
+    chargeur,
+    tokenizer,
+    n_lots: int,
+    ks: tuple[int, ...] = (1, 3, 4, 5),
+    peripherique=None,
+) -> ResultatSuggestions:
+    """Le token attendu figure-t-il dans les k plus probables ?
+
+    C'est la mesure directe d'un clavier à suggestions : quatre cases au-dessus
+    des touches, le bon mot est-il dedans ? La perplexité ne répond pas à cette
+    question — elle note la probabilité attribuée au bon mot, pas son rang.
+    """
+    peripherique = peripherique or next(modele.parameters()).device
+    etait = modele.training
+    modele.eval()
+
+    masque_mots = _debuts_de_mot(tokenizer).to(peripherique)
+    kmax = max(ks)
+    resultat = ResultatSuggestions(reussites=dict.fromkeys(ks, 0),
+                                   reussites_mots=dict.fromkeys(ks, 0))
+
+    for i in range(n_lots):
+        entree, cible = chargeur.lot(i)
+        entree, cible = entree.to(peripherique), cible.to(peripherique)
+        logits, _ = modele(entree, tous_les_pas=True)
+        # rang de la cible : est-elle dans les kmax premiers ?
+        meilleurs = logits.topk(kmax, dim=-1).indices          # (B, T, kmax)
+        touche = meilleurs.eq(cible.unsqueeze(-1))             # (B, T, kmax)
+        ouvre_un_mot = masque_mots[cible]                      # (B, T)
+
+        resultat.n_tokens += cible.numel()
+        resultat.n_debuts_de_mot += int(ouvre_un_mot.sum().item())
+        for k in ks:
+            dans_k = touche[..., :k].any(dim=-1)
+            resultat.reussites[k] += int(dans_k.sum().item())
+            resultat.reussites_mots[k] += int((dans_k & ouvre_un_mot).sum().item())
+
+    modele.train(etait)
+    return resultat
 
 
 # --------------------------------------------------------------------------- #
