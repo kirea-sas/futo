@@ -96,6 +96,13 @@ RANG, et un clavier ne montre que quatre rangs.
       honnête : compléter « aujourd' » par « hui » est facile, proposer le mot
       suivant quand rien n'est encore tapé l'est beaucoup moins
 - [ ] Relever le chiffre sur un point de reprise de `futo-mac`
+- [ ] **Extraire les pages de discussion du dump Wikipédia déjà téléchargé** —
+      le convertisseur ne garde que l'espace principal. Les pages de discussion
+      sont du français argumentatif spontané, déjà sous CC BY-SA, déjà sur le
+      disque : c'est le seul corpus conversationnel qui ne coûte ni
+      téléchargement ni décision juridique. À faire en premier
+      (voir [docs/DONNEES.md](docs/DONNEES.md), section « Français
+      conversationnel »)
 - [ ] Obstacle connu, et il est de fond : le modèle est entraîné sur Wikipédia.
       Un clavier sert à écrire des messages, pas des articles encyclopédiques.
       Le registre ne correspond pas, et aucune quantité d'entraînement ne

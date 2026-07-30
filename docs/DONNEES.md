@@ -103,6 +103,72 @@ projets francophones ont publié des corpus d'entraînement pensés pour le
 français, avec un travail de sélection et de documentation déjà fait. C'est la
 première piste à explorer avant de tout refaire soi-même.
 
+### Français conversationnel — le registre qui manque
+
+Wikipédia écrit « fut nommé », « situé dans le département », « selon les
+sources ». Personne n'écrit comme ça dans un message. Un modèle entraîné sur la
+seule encyclopédie parlera encyclopédie, et aucune quantité d'entraînement
+supplémentaire ne le corrigera : ce n'est pas un manque de volume, c'est un
+manque de registre. Pour tout usage conversationnel — assistant, clavier à
+suggestions, dialogue — il faut du français parlé ou écrit spontanément.
+
+Le problème : c'est la catégorie la plus rare et la plus mal licenciée.
+
+**Pages de discussion de Wikipédia** — déjà dans le dump téléchargé, déjà sous
+CC BY-SA, déjà conforme à la licence des poids. C'est du français argumentatif
+spontané, avec interpellations, désaccords et négociation. Ce n'est pas du SMS,
+mais c'est authentiquement dialogique, et c'est **gratuit** : le convertisseur
+ne garde aujourd'hui que l'espace principal. Volume à mesurer, probablement
+plusieurs centaines de millions de tokens. **La première chose à faire**, parce
+qu'elle ne coûte ni téléchargement ni décision juridique.
+
+**Théâtre et romans dialogués du domaine public** **[À VÉRIFIER]** — Molière,
+Marivaux, Feydeau, Wikisource, Gutenberg FR, Gallica. Du dialogue pur, licence
+parfaitement claire, registre daté mais structurellement conversationnel :
+tours de parole, questions, interruptions. Volume modeste (quelques dizaines de
+millions de tokens), qualité irréprochable.
+
+**Stack Exchange en français** **[À VÉRIFIER]** — les sites francophones du
+réseau publient des exports sous CC BY-SA, la même licence que les poids de
+Futo. Questions et réponses rédigées, ton direct. Volume modeste, licence
+limpide, aucune ambiguïté.
+
+**Débats parlementaires** **[À VÉRIFIER]** — comptes rendus de l'Assemblée
+nationale et du Sénat, publiés en données ouvertes sous Licence Ouverte, usage
+commercial permis. C'est de l'oral transcrit : phrases interrompues,
+interpellations, oralité réelle. Registre soutenu, mais parlé.
+
+**Corpus de français parlé transcrit** **[À VÉRIFIER]** — ESLO, ORFEO/CEFC,
+TCOF, CLAPI. Ce sont de vraies conversations enregistrées et transcrites par des
+linguistes : la meilleure qualité possible pour ce registre. Deux limites
+sérieuses : le volume est petit (quelques millions de mots, pas milliards), et
+beaucoup sont en **CC BY-NC**, ce qui interdit tout usage commercial et serait
+incompatible avec la licence des poids. Vérifier corpus par corpus.
+
+**Sous-titres (OpenSubtitles, via OPUS)** **[À VÉRIFIER, ET C'EST SÉRIEUX]** —
+de loin le plus gros gisement de dialogue français, à l'échelle du milliard de
+tokens. C'est aussi le plus problématique : les sous-titres sont des œuvres
+dérivées de films sous droits, déposés par des utilisateurs. La distribution
+académique ne vaut pas autorisation commerciale. Beaucoup de modèles s'en
+servent sans le dire ; ce projet publie ses sources, donc il ne peut pas le
+faire sans trancher. **Décision à prendre consciemment, pas par défaut.**
+
+**Forums extraits du web filtré** — dans FineWeb-2, OSCAR ou CulturaX, les
+pages de forum sont déjà présentes et peuvent être isolées par la forme de
+l'URL (`/forum/`, `/viewtopic.php`, `/t/`) ou par la structure des pages. C'est
+le moyen le plus réaliste d'obtenir du volume conversationnel sans changer de
+régime juridique : les mêmes conditions que le reste du web filtré, ni
+meilleures ni pires.
+
+**Ce qui n'existe pas** : il n'y a pas de corpus public de courriels ou de SMS
+français comparable à Enron pour l'anglais. Le registre le plus proche du
+clavier est donc précisément celui qu'on ne peut pas obtenir proprement.
+
+**Ordre de marche recommandé** : pages de discussion Wikipédia d'abord (gratuit,
+licence déjà acquise), puis débats parlementaires et Stack Exchange (licences
+limpides), puis forums extraits du web filtré pour le volume. Les sous-titres
+en dernier, et seulement après une décision explicite.
+
 ### Anglais et code
 
 Un modèle purement français est un choix défendable, mais coûteux en pratique :
