@@ -63,10 +63,20 @@ C'est **le** sujet. Le reste est de la plomberie déjà écrite.
 
 ## ⬜ Ensuite — le premier vrai modèle
 
-- [ ] Entraîner le tokenizer définitif sur 2 Go du corpus réel, vocabulaire 32 768
-- [ ] Mesurer sa fertilité et la comparer à celle d'un tokenizer généraliste
-      anglophone sur le même texte français — c'est le premier chiffre publiable
-      du projet, et il justifie à lui seul le travail sur la découpe
+- [x] **Tokenizer définitif entraîné** (30/07) : 2 Go du dump francophone réel,
+      vocabulaire 32 768, 10 minutes sur Apple M2 Max. Le premier essai avait été
+      jeté : `_lire_textes` donnait les lignes JSONL brutes au trainer, qui
+      apprenait `{"text": "` et `", "titre": "` — des places prises sur 32 768,
+      et du balisage que le modèle aurait recraché
+- [x] **Fertilité mesurée** (30/07) : 1,561 token/mot · 4,45 octet/token ·
+      73,4 % des mots rendus en un seul token, sur 29 771 mots. Les élisions
+      tiennent : `L'`, ` qu'`, ` aujourd'` ressortent soudées, exactement ce que
+      la découpe française visait
+- [ ] Comparer cette fertilité à celle d'un tokenizer généraliste anglophone sur
+      le MÊME texte français — c'est le chiffre publiable, et il justifie à lui
+      seul le travail sur la découpe. Bloqué ici : HuggingFace est injoignable
+      depuis l'environnement de développement, la comparaison doit se faire sur
+      le Mac
 - [ ] Entraîner `futo-small` (20-40 €) et publier les chiffres, bons ou mauvais
 - [ ] Comparer 3 à 4 mélanges de corpus à cette échelle avant de passer à la suite
 - [ ] Carte du modèle honnête : données, limites, biais, empreinte carbone
@@ -135,7 +145,10 @@ Tout ce qui suit vient d'une exécution réelle, pas d'une estimation.
 
 | Mesure | Valeur | Conditions |
 |---|---|---|
-| Fertilité du tokenizer | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
+| **Fertilité du tokenizer définitif** | **1,561 token/mot · 4,45 octet/token** | **vocab 32 768, 2 Go de frwiki réel** |
+| **Mots rendus en un seul token** | **73,4 %** | idem, sur 29 771 mots |
+| Entraînement du tokenizer | 10 min | Apple M2 Max, 2 Go lus |
+| Fertilité du tokenizer (ancien) | 1,62 token/mot · 3,69 octet/token | vocab 4 096, corpus d'exemple 142 Ko |
 | **Rapport octets/token sur Wikipédia** | **3,56 octet/token** | mesuré sur 1 000 puis 10 000 articles réels |
 | Extraction Wikipédia | 10 000 articles → 145 Mo, 40,7 M tokens | dump frwiki, médiane 6 424 car. |
 | Propreté du corpus extrait | 0,02 % de documents avec une trace | après correction ; 6,6 % avant |

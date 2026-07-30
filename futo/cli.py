@@ -175,8 +175,14 @@ def cmd_tokenizer_entrainer(args) -> int:
 
     fichiers = _etendre(args.corpus)
     octets = sum(f.stat().st_size for f in fichiers)
+    # La taille des fichiers n'est PAS ce qui sera lu : --octets-max plafonne le
+    # texte utile. Afficher la seule taille du fichier laissait croire que les
+    # 7,3 Go du dump allaient y passer.
     print(f"Entraînement du tokenizer sur {len(fichiers)} fichier(s), "
-          f"{_milliers(octets)} octets.")
+          f"{_milliers(octets)} octets sur le disque.")
+    if args.octets_max is not None and args.octets_max < octets:
+        print(f"  Texte réellement lu : {_milliers(args.octets_max)} octets au plus "
+              f"(--octets-max). Le reste du corpus n'est pas ouvert.")
     if octets < 1_000_000:
         print("  Attention : moins d'un mégaoctet de texte. Le vocabulaire obtenu")
         print("  sera pauvre. C'est acceptable pour un test, pas pour un vrai modèle.")
