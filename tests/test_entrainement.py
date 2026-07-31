@@ -436,3 +436,21 @@ def _copier(cfg: FutoConfig, dossier) -> FutoConfig:
     copie = FutoConfig.from_dict(cfg.to_dict())
     copie.train.dossier_sortie = str(dossier)
     return copie
+
+
+def test_les_cartes_gtx_sont_reconnues_et_ne_masquent_pas_les_rtx():
+    """« 1080 Ti » ne doit pas être confondue avec « 1080 », ni « 2080 Ti » avec « 2080 ».
+
+    La recherche se fait par clé la plus longue d'abord ; sans cela une GTX
+    1080 Ti hériterait de la crête d'une 1080, et une RTX 2080 Ti de celle
+    d'une 2080 — un MFU faux, dans le sens flatteur.
+    """
+    from futo.train import FLOPS_CRETE, flops_crete_du_materiel
+
+    assert flops_crete_du_materiel("NVIDIA GeForce GTX 1080 Ti") == FLOPS_CRETE["1080 Ti"]
+    assert flops_crete_du_materiel("NVIDIA GeForce GTX 1080") == FLOPS_CRETE["1080"]
+    assert flops_crete_du_materiel("NVIDIA GeForce RTX 2080 Ti") == FLOPS_CRETE["2080 Ti"]
+    assert flops_crete_du_materiel("NVIDIA GeForce RTX 2080") == FLOPS_CRETE["2080"]
+    assert FLOPS_CRETE["1080 Ti"] != FLOPS_CRETE["1080"]
+    # une carte inconnue ne casse rien : MFU nul, jamais d'exception
+    assert flops_crete_du_materiel("NVIDIA GeForce GTX 970") == 0.0

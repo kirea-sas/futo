@@ -114,7 +114,25 @@ FLOPS_CRETE = {
     "4090": 165e12,
     "4080": 98e12,
     "3090": 71e12,
+    "3080": 60e12,
+    "3070": 41e12,
+    "3060": 25e12,
     "V100": 125e12,
+    # Turing (RTX 20) : tenseurs fp16 seulement, PAS de bf16. L'entraînement
+    # tombe en fp16, plus fragile — surveillez les débordements.
+    "2080 Ti": 54e12,
+    "2080": 42e12,
+    "2070": 32e12,
+    "2060": 26e12,
+    # GTX : aucun cœur tenseur, et sur Pascal le fp16 est bridé à 1/64 de la
+    # vitesse fp32 sur les cartes GeForce. Ces crêtes sont donc des crêtes
+    # FP32 : le seul mode utilisable. Une GTX ne fait pas de précision mixte,
+    # elle ne gagnera rien là où un Mac ou une RTX gagnent un facteur deux.
+    "1080 Ti": 11.3e12,
+    "1080": 8.9e12,
+    "1070": 6.5e12,
+    "1660": 5.4e12,
+    "1650": 3.0e12,
     # Apple Silicon — approximatif, voir ci-dessus.
     "M4 Max": 18e12,
     "M4 Pro": 9e12,
