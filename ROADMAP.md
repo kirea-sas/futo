@@ -107,6 +107,31 @@ RANG, et un clavier ne montre que quatre rangs.
       Un clavier sert à écrire des messages, pas des articles encyclopédiques.
       Le registre ne correspond pas, et aucune quantité d'entraînement ne
       corrigera cela — il faut du corpus conversationnel (sous-titres, forums)
+- [x] **Export GGUF écrit** (30/07) : `futo exporter <checkpoint>` produit un
+      fichier lisible par llama.cpp, en float16 ou float32, vocabulaire
+      embarqué. Aucune dépendance ajoutée — l'écriture du format tient en un
+      module, et la quantification reste le métier de `llama-quantize`. Notre
+      architecture correspond un pour un à l'architecture `llama`, ce qui rend
+      la conversion mécanique. 13 tests, dont l'aller-retour à l'octet près et
+      le piège des dimensions inscrites à l'envers
+- [x] **Ce qu'attend le clavier FUTO, vérifié dans leur code** (30/07) : leur
+      moteur est un fork de llama.cpp, il charge un GGUF, et l'écran
+      « Import from file » accepte bien un modèle tiers. Leur modèle anglais
+      pèse 30,7 Mo en q6_k ; `futo-mac` en ferait environ 32 — la taille tombe
+      juste. Deux obstacles restent, et ils sont dans le tokenizer, pas dans
+      les poids
+- [ ] **Obstacle 1, la découpe.** llama.cpp ne rejoue pas notre découpe
+      française : il applique une expression régulière de sa propre table,
+      désignée par `tokenizer.ggml.pre`. Le texte brut y serait donc découpé
+      autrement qu'à l'entraînement, et le modèle rendrait moins que ce qu'il
+      vaut. Deux issues, aucune n'est un raccourci : faire enregistrer notre
+      découpe dans llama.cpp, ou n'envoyer que des identifiants déjà encodés
+- [ ] **Obstacle 2, les jetons de contrôle du clavier.** Leur runtime attend
+      `<XBU>`, `<XBC>`, `<XEC>` et `<CHAR_A>` à `<CHAR_Z>` dans le vocabulaire,
+      soit une trentaine de jetons réservés. Le tokenizer de Futo n'en réserve
+      que douze (`<|reserve_0|>` à `<|reserve_11|>`) : l'intuition était bonne,
+      le compte est court. À corriger AVANT le prochain entraînement du
+      tokenizer, sinon il faudra tout refaire
 - [ ] Autres travaux nécessaires avant tout produit : contrainte de préfixe
       (ne proposer que des mots compatibles avec ce qui est déjà tapé),
       poursuite des mots en plusieurs tokens, quantification pour tenir sur un

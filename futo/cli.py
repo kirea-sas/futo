@@ -512,6 +512,41 @@ def cmd_eval(args) -> int:
     return 0
 
 
+def cmd_exporter_gguf(args) -> int:
+    """Convertit un point de reprise en fichier GGUF, lisible par llama.cpp."""
+    from .gguf import exporter_gguf, lire_gguf
+    from .tokenizer import TokenizerFuto
+
+    tokenizer = None
+    if not args.sans_tokenizer:
+        import torch
+
+        charge = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+        chemin = args.tokenizer or charge["config_objet"].data.tokenizer
+        if Path(chemin).exists():
+            tokenizer = TokenizerFuto(chemin)
+        else:
+            print(f"Tokenizer introuvable ({chemin}) : le GGUF n'en portera pas.")
+
+    sortie = exporter_gguf(
+        args.checkpoint, args.sortie, tokenizer=tokenizer,
+        demi_precision=not args.f32, nom=args.nom,
+    )
+    relu = lire_gguf(sortie)
+    octets = Path(sortie).stat().st_size
+    print(f"Écrit : {sortie} ({_milliers(octets)} octets)")
+    print(f"  {len(relu['tenseurs'])} tenseurs · architecture "
+          f"{relu['metadonnees']['general.architecture']}")
+    if tokenizer is not None:
+        print(f"  vocabulaire embarqué : {len(relu['metadonnees']['tokenizer.ggml.tokens'])}")
+        print("  ATTENTION : llama.cpp ne rejoue pas notre découpe française.")
+        print("  Le texte brut y sera découpé autrement qu'à l'entraînement —")
+        print("  voir la réserve en tête de futo/gguf.py.")
+    print("\nPour quantifier, avec llama.cpp :")
+    print(f"  llama-quantize {sortie} {Path(sortie).with_suffix('')}-q6_k.gguf Q6_K")
+    return 0
+
+
 def cmd_generer(args) -> int:
     import torch
 
@@ -698,6 +733,17 @@ Chaque commande accepte --set pour surcharger la configuration :
     p.set_defaults(fonction=cmd_eval)
 
     # -- generer --
+    p = sous.add_parser("exporter", help="convertit un checkpoint en GGUF (llama.cpp)")
+    p.add_argument("checkpoint")
+    p.add_argument("--sortie", default="futo.gguf")
+    p.add_argument("--tokenizer")
+    p.add_argument("--nom", help="nom inscrit dans le fichier")
+    p.add_argument("--f32", action="store_true",
+                   help="pleine precision plutot que demi-precision")
+    p.add_argument("--sans-tokenizer", action="store_true",
+                   help="n embarque pas le vocabulaire")
+    p.set_defaults(fonction=cmd_exporter_gguf)
+
     p = sous.add_parser("generer", help="produit du texte avec un checkpoint")
     p.add_argument("checkpoint")
     p.add_argument("--amorce", default="", help="texte de départ")
