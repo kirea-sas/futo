@@ -46,6 +46,7 @@ from pathlib import Path
 
 __all__ = [
     "MOTIF_FRANCAIS",
+    "RESERVES",
     "TOKENS_SPECIAUX",
     "TokenizerFuto",
     "entrainer_tokenizer",
@@ -104,10 +105,25 @@ TOKENS_SPECIAUX: list[str] = [
     "<|rembourrage|>",  # 1 — remplissage des lots (jamais appris : masqué dans la perte)
     "<|debut_de_texte|>",  # 2 — BOS, optionnel
 ]
-# Douze emplacements réservés pour la suite (marqueurs de dialogue, rôles,
-# appels d'outils…). Les réserver dès maintenant évite d'avoir à réentraîner le
-# tokenizer, et donc le modèle, le jour où on en aura besoin.
-TOKENS_SPECIAUX += [f"<|reserve_{i}|>" for i in range(12)]
+# Quarante-deux emplacements réservés, contigus, et ce nombre n'est pas arbitraire.
+#
+# Un emplacement réservé ne coûte presque rien : le modèle ne le voit jamais à
+# l'entraînement, son embedding reste au bruit d'initialisation. Mais il doit
+# EXISTER dans le vocabulaire, sinon l'ajouter plus tard change la taille des
+# embeddings — c'est-à-dire réentraîner le modèle entier.
+#
+# Le compte vient d'un besoin réel, relevé dans le code du clavier FUTO, dont le
+# moteur est un fork de llama.cpp :
+#   26 jetons de caractère <CHAR_A> à <CHAR_Z>, qui doivent être CONTIGUS
+#      (leur code fait LETTERS_TO_IDS[i] = LETTERS_TO_IDS[0] + i)
+#    4 jetons de contrôle <XBU>, <XBC>, <XEC>, <XC0>
+#   12 pour nos propres besoins à venir : marqueurs de dialogue, rôles, outils
+#
+# Ces emplacements ne portent PAS les noms du clavier ici : rien de tiers n'est
+# gravé dans un artefact d'entraînement. Le renommage se fait à l'export, où il
+# ne coûte rien — voir `futo exporter --jetons-clavier`.
+RESERVES = 42
+TOKENS_SPECIAUX += [f"<|reserve_{i}|>" for i in range(RESERVES)]
 
 ID_FIN_DE_TEXTE = 0
 ID_REMBOURRAGE = 1

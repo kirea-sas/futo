@@ -531,6 +531,7 @@ def cmd_exporter_gguf(args) -> int:
     sortie = exporter_gguf(
         args.checkpoint, args.sortie, tokenizer=tokenizer,
         demi_precision=not args.f32, nom=args.nom,
+        jetons_clavier=args.jetons_clavier,
     )
     relu = lire_gguf(sortie)
     octets = Path(sortie).stat().st_size
@@ -539,6 +540,9 @@ def cmd_exporter_gguf(args) -> int:
           f"{relu['metadonnees']['general.architecture']}")
     if tokenizer is not None:
         print(f"  vocabulaire embarqué : {len(relu['metadonnees']['tokenizer.ggml.tokens'])}")
+        if args.jetons_clavier:
+            print("  emplacements réservés renommés aux jetons du clavier "
+                  "(<CHAR_A> à <CHAR_Z>, <XBU>, <XBC>, <XEC>, <XC0>)")
         print("  ATTENTION : llama.cpp ne rejoue pas notre découpe française.")
         print("  Le texte brut y sera découpé autrement qu'à l'entraînement —")
         print("  voir la réserve en tête de futo/gguf.py.")
@@ -742,6 +746,8 @@ Chaque commande accepte --set pour surcharger la configuration :
                    help="pleine precision plutot que demi-precision")
     p.add_argument("--sans-tokenizer", action="store_true",
                    help="n embarque pas le vocabulaire")
+    p.add_argument("--jetons-clavier", action="store_true",
+                   help="renomme les emplacements reserves aux jetons du clavier FUTO")
     p.set_defaults(fonction=cmd_exporter_gguf)
 
     p = sous.add_parser("generer", help="produit du texte avec un checkpoint")

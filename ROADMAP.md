@@ -126,12 +126,23 @@ RANG, et un clavier ne montre que quatre rangs.
       autrement qu'à l'entraînement, et le modèle rendrait moins que ce qu'il
       vaut. Deux issues, aucune n'est un raccourci : faire enregistrer notre
       découpe dans llama.cpp, ou n'envoyer que des identifiants déjà encodés
-- [ ] **Obstacle 2, les jetons de contrôle du clavier.** Leur runtime attend
-      `<XBU>`, `<XBC>`, `<XEC>` et `<CHAR_A>` à `<CHAR_Z>` dans le vocabulaire,
-      soit une trentaine de jetons réservés. Le tokenizer de Futo n'en réserve
-      que douze (`<|reserve_0|>` à `<|reserve_11|>`) : l'intuition était bonne,
-      le compte est court. À corriger AVANT le prochain entraînement du
-      tokenizer, sinon il faudra tout refaire
+- [x] **Obstacle 2 levé** (30/07) : leur runtime attend 26 jetons `<CHAR_A>` à
+      `<CHAR_Z>` — **contigus**, leur code faisant `LETTERS_TO_IDS[i] =
+      LETTERS_TO_IDS[0] + i` — plus `<XBU>`, `<XBC>`, `<XEC>` et `<XC0>`, soit
+      30 en tout. Le tokenizer n'en réservait que douze. Les réserves passent à
+      **42** : 30 pour le clavier, 12 pour nos propres besoins. Fait pendant
+      que le run tournait, donc sans rien coûter — l'ajouter après aurait
+      changé la taille des embeddings, c'est-à-dire réentraîné le modèle entier
+- [x] **Aucun nom tiers gravé dans un artefact d'entraînement** (30/07) : les
+      emplacements gardent leur nom neutre, et `futo exporter --jetons-clavier`
+      les renomme au moment de l'export. Ces jetons n'étant jamais vus à
+      l'entraînement, leur nom n'a aucune influence sur les poids : le renommage
+      est gratuit, réversible, et on peut changer d'avis sans rien réentraîner
+- [ ] **Obstacle 3, le marqueur d'espace.** Leur moteur cherche `▁` (U+2581),
+      la convention SentencePiece, là où un BPE au niveau octet écrit `Ġ`.
+      Leurs jetons `-` et `*` existent chez nous, mais pas `▁` ni `-▁`. À
+      instruire : leur code charge ces jetons selon les « features » déclarées
+      par le modèle, un modèle `base_v1` n'en a peut-être pas besoin
 - [ ] Autres travaux nécessaires avant tout produit : contrainte de préfixe
       (ne proposer que des mots compatibles avec ce qui est déjà tapé),
       poursuite des mots en plusieurs tokens, quantification pour tenir sur un
@@ -142,7 +153,7 @@ RANG, et un clavier ne montre que quatre rangs.
 - [ ] `futo-base` (150-250 €), si `futo-small` tient ses promesses
 - [ ] `futo-large` (1 500-2 500 €), seulement si tout le reste a tenu
 - [ ] Réglage par instructions, et les tokens de dialogue déjà réservés dans le
-      tokenizer (`<|reserve_0|>` à `<|reserve_11|>` — prévus pour n'avoir jamais
+      tokenizer (`<|reserve_0|>` à `<|reserve_41|>` — prévus pour n'avoir jamais
       à réentraîner le tokenizer, donc le modèle)
 - [ ] Export vers d'autres écosystèmes (extra `[hf]`, volontairement isolé du cœur)
 - [ ] Quantification pour l'inférence

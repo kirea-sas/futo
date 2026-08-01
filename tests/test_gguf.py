@@ -216,7 +216,7 @@ def test_un_tokenizer_qui_ne_correspond_pas_est_refuse(tmp_path):
 
     corpus = tmp_path / "c.txt"
     corpus.write_text("Le chat dort sur le tapis. " * 300, encoding="utf-8")
-    tok = entrainer_tokenizer([corpus], tmp_path / "tok.json", vocab_size=300, verbeux=False)
+    tok = entrainer_tokenizer([corpus], tmp_path / "tok.json", vocab_size=400, verbeux=False)
 
     cfg = _config(vocab=tok.vocab_size + 7)  # décalage volontaire
     cfg.data.tokenizer = str(tmp_path / "tok.json")
@@ -229,3 +229,74 @@ def test_un_tokenizer_qui_ne_correspond_pas_est_refuse(tmp_path):
     # sans tokenizer, l'export passe : le fichier ne porte alors aucun vocabulaire
     relu = lire_gguf(exporter_gguf(checkpoint, tmp_path / "b.gguf"))
     assert "tokenizer.ggml.tokens" not in relu["metadonnees"]
+
+
+def test_les_reserves_suffisent_aux_jetons_du_clavier():
+    """Le compte doit tenir, sinon c'est un réentraînement complet.
+
+    Trente jetons sont exigés par le moteur du clavier ; le tokenizer en
+    réserve quarante-deux. Si quelqu'un rabaisse RESERVES, ce test le dit.
+    """
+    from futo.gguf import JETONS_CLAVIER
+    from futo.tokenizer import RESERVES
+
+    assert len(JETONS_CLAVIER) == 30, "26 jetons de caractère + 4 de contrôle"
+    assert RESERVES >= len(JETONS_CLAVIER), (
+        f"{RESERVES} réserves pour {len(JETONS_CLAVIER)} jetons exigés : "
+        f"il faudrait réentraîner le tokenizer ET le modèle."
+    )
+
+
+def test_les_jetons_de_caractere_restent_contigus():
+    """Leur code fait LETTERS_TO_IDS[i] = LETTERS_TO_IDS[0] + i.
+
+    Un trou dans la suite <CHAR_A>…<CHAR_Z> et le clavier lit n importe quoi,
+    sans erreur visible.
+    """
+    from futo.gguf import JETONS_CLAVIER, renommer_reserves
+
+    jetons = ["<|fin_de_texte|>"] + [f"<|reserve_{i}|>" for i in range(42)] + ["Ġchat"]
+    renommes = renommer_reserves(jetons, JETONS_CLAVIER)
+
+    positions = [renommes.index(f"<CHAR_{chr(ord('A') + i)}>") for i in range(26)]
+    assert positions == list(range(positions[0], positions[0] + 26)), (
+        f"jetons de caractère non contigus : {positions}"
+    )
+    # le reste du vocabulaire n a pas bougé
+    assert renommes[0] == "<|fin_de_texte|>"
+    assert renommes[-1] == "Ġchat"
+    assert len(renommes) == len(jetons)
+
+
+def test_un_vocabulaire_sans_assez_de_reserves_est_refuse():
+    """Un tokenizer entraîné avant le passage à 42 réserves doit être signalé."""
+    from futo.gguf import JETONS_CLAVIER, renommer_reserves
+
+    ancien = ["<|fin_de_texte|>"] + [f"<|reserve_{i}|>" for i in range(12)]
+    with pytest.raises(ValueError, match="réentraîner"):
+        renommer_reserves(ancien, JETONS_CLAVIER)
+
+
+def test_export_avec_les_jetons_du_clavier(tmp_path):
+    """Le chemin complet : un checkpoint, un GGUF portant les jetons du clavier."""
+    from futo.tokenizer import entrainer_tokenizer
+
+    corpus = tmp_path / "c.txt"
+    corpus.write_text("Le chat dort sur le tapis. L'homme qu'elle attend. " * 300,
+                      encoding="utf-8")
+    tok = entrainer_tokenizer([corpus], tmp_path / "tok.json", vocab_size=400, verbeux=False)
+
+    cfg = _config(vocab=tok.vocab_size)
+    checkpoint = tmp_path / "dernier.pt"
+    torch.save({"config_objet": cfg, "modele": Futo(cfg.model).state_dict()}, checkpoint)
+
+    sortie = exporter_gguf(checkpoint, tmp_path / "clavier.gguf",
+                           tokenizer=tok, jetons_clavier=True)
+    jetons = lire_gguf(sortie)["metadonnees"]["tokenizer.ggml.tokens"]
+
+    for attendu in ("<CHAR_A>", "<CHAR_Z>", "<XBU>", "<XBC>", "<XEC>", "<XC0>"):
+        assert attendu in jetons, f"{attendu} absent du GGUF"
+    # sans le drapeau, rien n est renommé : aucun nom tiers dans l artefact
+    nu = lire_gguf(exporter_gguf(checkpoint, tmp_path / "nu.gguf", tokenizer=tok))
+    assert "<CHAR_A>" not in nu["metadonnees"]["tokenizer.ggml.tokens"]
+    assert "<|reserve_0|>" in nu["metadonnees"]["tokenizer.ggml.tokens"]

@@ -51,7 +51,9 @@ __all__ = [
     "TYPES_VALEUR",
     "ecrire_gguf",
     "lire_gguf",
+    "JETONS_CLAVIER",
     "metadonnees_depuis_config",
+    "renommer_reserves",
     "tenseurs_depuis_etat",
     "exporter_gguf",
 ]
@@ -335,7 +337,9 @@ def tenseurs_depuis_etat(etat: dict, demi_precision: bool = True) -> dict:
     return sortie
 
 
-def metadonnees_depuis_config(cfg, tokenizer=None, nom: str = "futo") -> dict:
+def metadonnees_depuis_config(
+    cfg, tokenizer=None, nom: str = "futo", jetons_clavier: bool = False
+) -> dict:
     """Métadonnées d'architecture, plus le vocabulaire si un tokenizer est fourni."""
     m = cfg.model
     metadonnees = {
@@ -354,11 +358,43 @@ def metadonnees_depuis_config(cfg, tokenizer=None, nom: str = "futo") -> dict:
         "llama.vocab_size": m.vocab_size,
     }
     if tokenizer is not None:
-        metadonnees.update(_metadonnees_tokenizer(tokenizer))
+        metadonnees.update(_metadonnees_tokenizer(tokenizer, jetons_clavier))
     return metadonnees
 
 
-def _metadonnees_tokenizer(tokenizer) -> dict:
+# Jetons attendus par le moteur du clavier FUTO, relevés dans son code source
+# (native/jni/…_LanguageModel.cpp). Les 26 jetons de caractère doivent être
+# CONTIGUS : leur boucle fait LETTERS_TO_IDS[i] = LETTERS_TO_IDS[0] + i.
+JETONS_CLAVIER: list[str] = (
+    [f"<CHAR_{chr(ord('A') + i)}>" for i in range(26)]
+    + ["<XBU>", "<XBC>", "<XEC>", "<XC0>"]
+)
+
+
+def renommer_reserves(jetons: list[str], noms: list[str]) -> list[str]:
+    """Donne un nom aux emplacements réservés, sans toucher au reste.
+
+    Renommer à l'export plutôt qu'à l'entraînement : ces jetons ne sont jamais
+    vus par le modèle, leur nom n'a donc aucune influence sur les poids. Cela
+    évite de graver un besoin tiers dans un artefact d'entraînement, et permet
+    de changer d'avis sans réentraîner quoi que ce soit.
+
+    L'ordre est préservé, donc la contiguïté des réserves l'est aussi.
+    """
+    positions = [i for i, jeton in enumerate(jetons) if jeton.startswith("<|reserve_")]
+    if len(positions) < len(noms):
+        raise ValueError(
+            f"{len(noms)} noms à placer mais seulement {len(positions)} emplacements "
+            f"réservés dans ce vocabulaire. Ce tokenizer est antérieur au passage à "
+            f"42 réserves : il faut le réentraîner, et le modèle avec."
+        )
+    renommes = list(jetons)
+    for position, nom in zip(positions, noms, strict=False):
+        renommes[position] = nom
+    return renommes
+
+
+def _metadonnees_tokenizer(tokenizer, jetons_clavier: bool = False) -> dict:
     """Vocabulaire et fusions, lus directement dans le fichier du tokenizer.
 
     Le type annoncé est `gpt2`, c'est-à-dire BPE au niveau octet — ce que nous
@@ -380,6 +416,9 @@ def _metadonnees_tokenizer(tokenizer) -> dict:
     ajoutes = {j["id"] for j in donnees.get("added_tokens", [])}
     types = [3 if i in ajoutes else 1 for i in range(len(jetons))]
 
+    if jetons_clavier:
+        jetons = renommer_reserves(jetons, JETONS_CLAVIER)
+
     return {
         "tokenizer.ggml.model": "gpt2",
         "tokenizer.ggml.pre": "default",
@@ -398,6 +437,7 @@ def exporter_gguf(
     tokenizer=None,
     demi_precision: bool = True,
     nom: str | None = None,
+    jetons_clavier: bool = False,
 ) -> Path:
     """Convertit un point de reprise Futo en fichier GGUF."""
     import torch
@@ -408,7 +448,7 @@ def exporter_gguf(
     etat = {c.replace("_orig_mod.", "").replace("module.", ""): v for c, v in etat.items()}
 
     tenseurs = tenseurs_depuis_etat(etat, demi_precision=demi_precision)
-    metadonnees = metadonnees_depuis_config(cfg, tokenizer, nom or cfg.nom)
+    metadonnees = metadonnees_depuis_config(cfg, tokenizer, nom or cfg.nom, jetons_clavier)
 
     # llama.cpp compare le nombre de jetons embarqués à la dimension des
     # embeddings et refuse le fichier s'ils divergent. Mieux vaut échouer ici,
