@@ -122,6 +122,17 @@ RANG, et un clavier ne montre que quatre rangs.
 - [ ] Export vers d'autres écosystèmes (extra `[hf]`, volontairement isolé du cœur)
 - [ ] Quantification pour l'inférence
 
+## 📘 Documentation
+
+- [x] **Guide de reproduction complet** (30/07) :
+      [docs/REPRODUIRE.md](docs/REPRODUIRE.md) permet de refaire tout le
+      travail depuis un dépôt vierge jusqu'au modèle mesuré, sans connaître le
+      projet et sans poser de question. Chaque commande telle qu'elle a été
+      lancée, chaque durée telle qu'elle a été relevée, et les onze pièges
+      réellement rencontrés, signalés à l'endroit où ils se présentent. Deux
+      tests le tiennent honnête : toute option citée doit exister dans la ligne
+      de commande, et toute étape de la chaîne doit y figurer
+
 ## 🛠 Dette technique connue
 
 - [ ] Le cache KV grandit par concaténation : simple et suffisant pour quelques

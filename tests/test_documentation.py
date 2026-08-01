@@ -250,3 +250,63 @@ def test_commandes_du_readme_existent_dans_la_cli():
         f"Le README cite des sous-commandes inexistantes : {sorted(inconnues)}. "
         f"Sous-commandes réelles : {sorted(connues)}."
     )
+
+
+def test_le_guide_de_reproduction_ne_cite_que_des_commandes_reelles():
+    """Un guide qui promet de tout refaire ne peut pas citer une commande morte.
+
+    Contrôle plus strict que celui du README : on vérifie le COUPLE
+    « sous-commande + option », car une option renommée casse un copier-coller
+    aussi surement qu'une sous-commande disparue.
+    """
+    import argparse
+
+    from futo.cli import construire_analyseur
+
+    analyseur = construire_analyseur()
+
+    def options(parseur) -> set[str]:
+        trouvees = set()
+        for action in parseur._actions:
+            trouvees.update(action.option_strings)
+            if isinstance(action, argparse._SubParsersAction):
+                for sous in action.choices.values():
+                    trouvees |= options(sous)
+        return trouvees
+
+    connues = options(analyseur)
+    guide = RACINE / "docs" / "REPRODUIRE.md"
+    assert guide.exists(), "docs/REPRODUIRE.md a disparu"
+
+    citees = set()
+    for _, ligne in _blocs_shell(guide.read_text(encoding="utf-8")):
+        if "futo " not in ligne and not ligne.strip().startswith("--"):
+            continue
+        citees.update(re.findall(r"(--[a-z][a-z0-9-]+)", ligne))
+
+    inconnues = citees - connues
+    assert not inconnues, (
+        f"docs/REPRODUIRE.md cite des options inexistantes : {sorted(inconnues)}"
+    )
+
+
+def test_le_guide_de_reproduction_couvre_toute_la_chaine():
+    """Chaque etape de la chaine doit y figurer, sinon le guide ne tient pas
+    sa promesse : partir de zero et arriver a un modele mesure."""
+    guide = (RACINE / "docs" / "REPRODUIRE.md").read_text(encoding="utf-8")
+    lignes = [ligne for _, ligne in _blocs_shell(guide)]
+    bloc = "\n".join(lignes)
+    for etape in (
+        "python3 -m venv",
+        "pip install -e .",
+        "futo data wikipedia --telecharger",
+        "futo data controler",
+        "futo tokenizer entrainer",
+        "futo data preparer",
+        "futo bench",
+        "futo train",
+        "futo eval",
+        "futo generer",
+        "--reprendre",
+    ):
+        assert etape in bloc, f"docs/REPRODUIRE.md ne montre pas : {etape}"

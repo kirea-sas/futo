@@ -24,6 +24,11 @@ qu'exige le web brut. Un dump se convertit en une commande —
 `futo data wikipedia <dump>` — qui nettoie le wikitexte, écrit le JSONL attendu
 et consigne la source. Reste à trancher la licence CC BY-SA avant d'entraîner.
 
+Publié par **Kirea SAS** — [kirea.fr](https://kirea.fr).
+
+**Pour tout refaire de zéro**, jusqu'au modèle entraîné et mesuré, chaque
+commande et chaque durée relevée : [docs/REPRODUIRE.md](docs/REPRODUIRE.md).
+
 ---
 
 ## Essayer en cinq minutes
@@ -255,7 +260,7 @@ data/echantillon/  142 Ko de français original, pour les tests hors ligne
 data/sondes/     les 72 paires minimales françaises
 tests/           279 tests, 17 s sur processeur, sans réseau
 scripts/         la chaîne complète, lancée à l'identique en local et en CI
-docs/            architecture, données, carte du modèle, Mac
+docs/            reproduction complète, architecture, données, carte du modèle, Mac
 ```
 
 ---
