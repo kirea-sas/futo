@@ -241,7 +241,7 @@ def test_les_reserves_suffisent_aux_jetons_du_clavier():
     from futo.tokenizer import RESERVES
 
     assert len(JETONS_CLAVIER) == 30, "26 jetons de caractère + 4 de contrôle"
-    assert RESERVES >= len(JETONS_CLAVIER), (
+    assert len(JETONS_CLAVIER) <= RESERVES, (
         f"{RESERVES} réserves pour {len(JETONS_CLAVIER)} jetons exigés : "
         f"il faudrait réentraîner le tokenizer ET le modèle."
     )
